@@ -1,12 +1,5 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>旅伴手帳</title>
-<link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#d7e8f8">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="旅伴手帳">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap">
 <style>
@@ -255,94 +248,6 @@ select{text-overflow:ellipsis}
 <div id="toast" hidden></div>
 
 <script>
-/* Local-storage backend: stands in for Claude's db/user so the app runs on any static host (e.g. GitHub Pages). */
-(function(){
-  if(window.claude&&window.claude.use)return;
-  var KEY='tb-localdb-v1',PREFS=['tb-fx','tb-ovcur','tb-name'];
-  var data={};
-  try{data=JSON.parse(localStorage.getItem(KEY)||'{}')||{};}catch(e){data={};}
-  var listeners=new Set();
-  var clone=function(v){return v===undefined?undefined:JSON.parse(JSON.stringify(v));};
-  var isObj=function(v){return v&&typeof v==='object'&&!Array.isArray(v);};
-  function merge(a,b){var o=Object.assign({},a);for(var k in b){o[k]=(isObj(b[k])&&isObj(o[k]))?merge(o[k],b[k]):b[k];}return o;}
-  function save(){try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){}}
-  function childKeys(path){var p=path+'/';return Object.keys(data).filter(function(k){return k.indexOf(p)===0&&k.slice(p.length).indexOf('/')<0;}).sort();}
-  function snapOf(path){
-    var docs=childKeys(path).map(function(k){return {id:k.slice(path.length+1),exists:true,data:function(){return clone(data[k]);}};});
-    return {docs:docs,size:docs.length,empty:!docs.length,forEach:function(f){docs.forEach(f);}};
-  }
-  function notify(docPath){
-    var parent=docPath.slice(0,docPath.lastIndexOf('/'));
-    setTimeout(function(){listeners.forEach(function(l){if(l.path===parent){try{l.cb(snapOf(parent));}catch(e){console.error(e);}}});},0);
-  }
-  function doc(path){
-    var id=path.slice(path.lastIndexOf('/')+1);
-    return {
-      id:id,path:path,
-      get:function(){var v=data[path];return Promise.resolve({id:id,exists:v!==undefined,data:function(){return clone(v);}});},
-      set:function(v){data[path]=clone(v);save();notify(path);return Promise.resolve();},
-      update:function(v){data[path]=merge(data[path]||{},clone(v));save();notify(path);return Promise.resolve();},
-      delete:function(){delete data[path];save();notify(path);return Promise.resolve();}
-    };
-  }
-  function collection(path){
-    return {
-      path:path,
-      doc:function(id){return doc(path+'/'+id);},
-      get:function(){return Promise.resolve(snapOf(path));},
-      onSnapshot:function(cb){
-        var l={path:path,cb:cb};listeners.add(l);
-        setTimeout(function(){if(listeners.has(l))cb(snapOf(path));},0);
-        return function(){listeners.delete(l);};
-      }
-    };
-  }
-  var db={doc:doc,collection:collection};
-  var user={
-    id:function(){return Promise.resolve('local');},
-    me:function(){return Promise.resolve({id:'local'});},
-    can:function(){return Promise.resolve(true);},
-    canEdit:function(){return Promise.resolve(true);},
-    isOwner:function(){return Promise.resolve(true);},
-    profiles:function(){return Promise.resolve({});}
-  };
-  window.claude={use:function(n){return Promise.resolve(n==='db'?db:n==='user'?user:null);}};
-
-  /* backup / restore */
-  function stamp(){var d=new Date(),p=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate());}
-  function exportData(){
-    var prefs={};PREFS.forEach(function(k){var v=localStorage.getItem(k);if(v!==null)prefs[k]=v;});
-    var json=JSON.stringify({app:'travel-companion',version:1,exportedAt:new Date().toISOString(),data:data,prefs:prefs},null,1);
-    var name='\u65c5\u4f34\u624b\u5e33\u5099\u4efd-'+stamp()+'.json';
-    var file=null;try{file=new File([json],name,{type:'application/json'});}catch(e){}
-    if(file&&navigator.canShare&&navigator.canShare({files:[file]})&&navigator.share){
-      navigator.share({files:[file],title:name}).catch(function(){});return;
-    }
-    var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([json],{type:'application/json'}));a.download=name;
-    document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1000);
-  }
-  function importData(){
-    var inp=document.createElement('input');inp.type='file';inp.accept='application/json,.json';
-    inp.onchange=function(){
-      var f=inp.files&&inp.files[0];if(!f)return;
-      var r=new FileReader();
-      r.onload=function(){
-        var o;try{o=JSON.parse(r.result);}catch(e){alert('\u9019\u4e0d\u662f\u6b63\u78ba\u7684\u5099\u4efd\u6a94\u3002');return;}
-        if(!o||o.app!=='travel-companion'||!isObj(o.data)){alert('\u9019\u4e0d\u662f\u65c5\u4f34\u624b\u5e33\u7684\u5099\u4efd\u6a94\u3002');return;}
-        if(!confirm('\u9084\u539f\u6703\u8986\u84cb\u9019\u652f\u624b\u6a5f\u76ee\u524d\u7684\u6240\u6709\u65c5\u884c\u8cc7\u6599\uff0c\u78ba\u5b9a\u8981\u7e7c\u7e8c\u55ce\uff1f'))return;
-        data=o.data;save();
-        try{var p=o.prefs||{};Object.keys(p).forEach(function(k){if(PREFS.indexOf(k)>=0)localStorage.setItem(k,String(p[k]));});}catch(e){}
-        location.reload();
-      };
-      r.readAsText(f);
-    };
-    inp.click();
-  }
-  window.__tbBackup={export:exportData,import:importData,_data:function(){return data;}};
-})();
-
-</script>
-<script>
 (function(){
 'use strict';
 const $=(s,r=document)=>r.querySelector(s);
@@ -525,7 +430,7 @@ function banner(){
   return h;
 }
 function view(){
-  if(S.ready==='nodb')return '<section class="hero"><h1>旅伴手帳</h1><p>這個瀏覽器不允許儲存資料（可能是無痕模式或停用了網站資料）。請改用一般模式開啟，並允許網站儲存資料。</p></section>';
+  if(S.ready==='nodb')return '<section class="hero"><h1>旅伴手帳</h1><p>這個頁面需要登入 Claude 才能儲存與共用旅行資料。請登入後，再用朋友分享給你的連結開啟。</p></section>';
   if(!S.ready)return banner()+'<div class="empty" style="margin-top:40px">載入中…</div>';
   return S.tid?tripView():homeView();
 }
@@ -795,14 +700,10 @@ function ovViewOld(){
 function homeTrips(){
   const list=Object.keys(S.mine).filter(id=>S.trips[id]).sort((a,b)=>(S.mine[b].joinedAt||0)-(S.mine[a].joinedAt||0));
   return banner()+
-  '<section class="hero"><h1>旅伴手帳</h1><p>一個房間就是一趟旅行：行程、行李清單與分帳記帳都在這裡。把旅伴加進來，記帳時自動算出誰該給誰多少錢。</p></section>'+homeSeg()+
-  '<div class="cta"><button class="btn primary" data-act="new-trip">新增旅行</button></div>'+
+  '<section class="hero"><h1>旅伴手帳</h1><p>一個房間就是一趟旅行：大家看同一份行程，各自檢查行李，記帳時自動算出誰該給誰多少錢。</p></section>'+homeSeg()+
+  '<div class="cta"><button class="btn primary" data-act="new-trip">新增旅行</button><button class="btn" data-act="join-code">輸入房間代碼</button></div>'+
   (list.length?'<h2 class="sec">我的旅行</h2><div class="passes">'+list.map(passHtml).join('')+'</div>'
-   :'<div class="empty" style="margin-top:18px">還沒有旅行。按「新增旅行」開始。</div>')+backupBar();
-}
-function backupBar(){
-  if(!window.__tbBackup)return '';
-  return '<div class="sub" style="margin-top:28px;text-align:center;line-height:1.9">資料只存在這支手機的瀏覽器裡。換手機或清除瀏覽器資料前，請先<button class="link" data-act="backup-export">備份資料</button>，之後可以<button class="link" data-act="backup-import">還原資料</button>。</div>';
+   :'<div class="empty" style="margin-top:18px">還沒有旅行。新增一趟，或輸入朋友給你的房間代碼加入。</div>');
 }
 function passHtml(id){
   const t=S.trips[id];
@@ -1313,182 +1214,4 @@ document.addEventListener('click',ev=>{
       render(true);break;}
     case 'cmp-view':S.cmpView=d.v;render(true);break;
     case 'ov-cur':openOvCur();break;
-    case 'home-tab':S.homeTab=d.v;if(d.v==='ov')ensureOv();render(true);break;
-    case 'open-ov':S.nextTab='spend';S.spendView='mine';location.hash='#t-'+d.id;break;
-    case 'backup-export':window.__tbBackup&&window.__tbBackup.export();break;
-    case 'backup-import':window.__tbBackup&&window.__tbBackup.import();break;
-    case 'new-trip':openNewTrip();break;
-    case 'join-code':openJoin();break;
-    case 'copy-trip':openCopy(d.id);break;
-    case 'copy-trip-here':openCopy(S.tid);break;
-    case 'copy-code':{
-      const code=d.code;
-      const fail=()=>toast('房間代碼：'+code+'（請手動複製）');
-      try{navigator.clipboard.writeText(code).then(()=>toast('已複製房間代碼 '+code),fail);}catch(e){fail();}
-      break;}
-    case 'tab':S.tab=d.tab;S.armed=null;render(true);window.scrollTo(0,0);break;
-    case 'day':S.day=+d.day;render(true);break;
-    case 'rm-day':{
-      const t=trip();const n=Math.max(t.days||1,...S.td.plan.map(p=>p.day||1));
-      if(n<=1)break;
-      arm('rm-day',()=>{const tid=S.tid;const gone=S.td.plan.filter(p=>(p.day||1)===n);if(S.day>=n)S.day=n-1;
-        w(async()=>{for(const p of gone)await dbp('trips/'+tid+'/plan/'+p.id).delete();await q('t:'+tid,()=>dbp('trips/'+tid).update({days:n-1}));});});
-      break;}
-    case 'add-day':{const t=trip();const n=Math.max(t.days||1,...S.td.plan.map(p=>p.day||1))+1;S.day=n;w(()=>q('t:'+S.tid,()=>dbp('trips/'+S.tid).update({days:n})));break;}
-    case 'mv-plan':movePlan(d.id,+d.dir);break;
-    case 'sort-time':sortDayByTime();break;
-    case 'add-plan':openPlan();break;
-    case 'edit-plan':openPlan(d.id);break;
-    case 'pack-scope':S.packScope=d.scope;render(true);break;
-    case 'quick-pack':addPack(d.text,S.packScope);break;
-    case 'del-pack':{
-      const kind=d.kind,id=d.id;
-      arm('pack:'+kind+':'+id,()=>{
-        if(kind==='all')w(()=>dbp('trips/'+S.tid+'/pack/'+id).delete());
-        else{const extra=(P().extra||[]).filter(x=>x.id!==id);const tid=S.tid;w(()=>q('p:'+tid,()=>dbp('data/users/'+S.uid+'/'+tid).update({extra})));}
-      });break;}
-    case 'spend-view':S.spendView=d.v;S.armed=null;render(true);break;
-    case 'add-mine':openMine();break;
-    case 'edit-mine':openMine(d.id);break;
-    case 'add-spend':openExpense();break;
-    case 'copy-pub':{
-      const pe=S.td.pub.find(x=>x.id===d.id);if(!pe)break;
-      const tid=S.tid,mine=(P().mine||[]).slice();
-      if(mine.some(x=>x.from===pe.id)){toast('已經複製過了');break;}
-      mine.push({id:rid(6),title:pe.title,amount:pe.amount,cur:pe.cur,cat:pe.cat||'其他',ft:pe.ft||'',date:pe.date||'',note:'',pub:false,at:Date.now(),from:pe.id});
-      w(()=>q('p:'+tid,()=>dbp('data/users/'+S.uid+'/'+tid).update({mine})));
-      toast('已複製到「我的花費」');break;}
-    case 'edit-spend':openExpense(d.id);break;
-    case 'settle':{
-      const key='settle:'+d.from+':'+d.to;const t=trip();
-      arm(key,()=>w(()=>dbp('trips/'+S.tid+'/spend/'+rid(8)).set({title:'還款',amount:+d.amt,cur:t.base,payer:d.from,mode:'transfer',among:[d.to],custom:{},cat:'',at:Date.now()})));
-      break;}
-    case 'rename-person':openRename(d.id);break;
-    case 'set-me':{const tid=S.tid;w(()=>q('p:'+tid,()=>dbp('data/users/'+S.uid+'/'+tid).update({me:d.id})));break;}
-    case 'del-person':{
-      const id=d.id;
-      const used=S.td.spend.some(e=>e.payer===id||(e.among||[]).includes(id)||(e.custom&&e.custom[id]!=null));
-      if(used){toast('這位旅伴已有帳目，不能移除。');break;}
-      if(S.td.people.length<=1){toast('至少要留一位旅伴。');break;}
-      arm('person:'+id,()=>w(()=>dbp('trips/'+S.tid+'/people/'+id).delete()));break;}
-    case 'del-cur':{
-      const c=d.cur;
-      if(S.td.spend.some(e=>e.cur===c)){toast(c+' 已有帳目，不能移除。');break;}
-      const t=trip();const next=(t.currencies||[]).filter(x=>x!==c);
-      w(()=>q('t:'+S.tid,()=>dbp('trips/'+S.tid).update({currencies:next})));break;}
-    case 'edit-trip':openTripForm();break;
-    case 'leave':{
-      const tid=S.tid;
-      arm('leave',async()=>{await w(()=>dbp('data/users/'+S.uid+'/'+tid).delete());location.hash='';});break;}
-  }
-});
-document.addEventListener('change',ev=>{
-  const ot=ev.target.closest('[data-ov-trip]');
-  if(ot){S.ovTrip=ot.value;render(true);return;}
-  const ci=ev.target.closest('[data-cmp-item]');if(ci){S.cmpItem=ci.value;render(true);return;}
-  const cb=ev.target.closest('[data-cmp-basis]');if(cb){S.cmpBasis=cb.value;render(true);return;}
-  const ds=ev.target.closest('[data-dest-sel]');
-  if(ds){
-    const inp=ds.closest('form').querySelector('input[name=dest]');const v=ds.value;
-    if(v==='__other'){if(DESTS.includes(inp.value))inp.value='';inp.hidden=false;try{inp.focus();}catch(e){}}
-    else{inp.value=v;inp.hidden=true;}
-    return;
-  }
-  const c=ev.target.closest('[data-pack]');
-  if(c){
-    const kind=c.dataset.pack,id=c.dataset.id,on=c.checked,tid=S.tid;
-    if(kind==='all')w(()=>q('p:'+tid,()=>dbp('data/users/'+S.uid+'/'+tid).update({checked:{[id]:on}})));
-    else{const extra=(P().extra||[]).map(x=>x.id===id?Object.assign({},x,{done:on}):x);w(()=>q('p:'+tid,()=>dbp('data/users/'+S.uid+'/'+tid).update({extra})));}
-    return;
-  }
-  const r=ev.target.closest('[data-rate]');
-  if(r){
-    const cur=r.dataset.rate,v=parseFloat(r.value);
-    if(!(v>0)){toast('匯率要大於 0');return;}
-    w(()=>q('t:'+S.tid,()=>dbp('trips/'+S.tid).update({rates:{[cur]:v}})));
-  }
-});
-document.addEventListener('submit',async ev=>{
-  const form=ev.target.closest('form[data-form]');if(!form)return;
-  ev.preventDefault();
-  const kind=form.dataset.form;const fd=new FormData(form);
-  const g=n=>String(fd.get(n)==null?'':fd.get(n)).trim();
-  if(kind==='newtrip'){
-    const st=form._st;const base=g('base');
-    const currencies=[...st.cur].filter(c=>c!==base);
-    const rates={};currencies.forEach(c=>{const r=parseFloat(st.rates[c]);if(r>0)rates[c]=r;});
-    const v={name:g('name'),dest:g('dest'),start:g('start'),days:Math.max(1,Math.min(60,parseInt(g('days'))||1)),me:g('me'),base,currencies,rates};
-    if(!v.name||!v.me)return;
-    ls('tb-name',v.me);closeSheet();
-    const tid=await w(()=>createTrip(v));if(tid)go(tid);
-  }else if(kind==='joincode'||kind==='gate'){
-    const code=g('code').toUpperCase().replace(/[^A-Z0-9]/g,'');
-    const id=Object.keys(S.trips).find(k=>S.trips[k].code===code);
-    if(!id||(kind==='gate'&&id!==S.tid)){toast('找不到這組房間代碼，請再確認一次。');return;}
-    if(S.mine[id]){closeSheet();go(id);return;}
-    closeSheet();startJoin(id);
-  }else if(kind==='identity'){
-    const tid=form.dataset.tid;const name=g('name');let pid=form._pid;
-    if(!pid&&!name){toast('請選擇你是誰，或輸入名字');return;}
-    closeSheet();
-    const ok=await w(async()=>{
-      if(!pid){pid=rid(8);await S.db.doc('trips/'+tid+'/people/'+pid).set({name,at:Date.now()});ls('tb-name',name);}
-      await S.db.doc('data/users/'+S.uid+'/'+tid).set({me:pid,joinedAt:Date.now(),checked:{},extra:[]});return true;});
-    if(ok)go(tid);
-  }else if(kind==='plan'){
-    const id=form.dataset.id;const title=g('title');if(!title)return;
-    const old=id?S.td.plan.find(x=>x.id===id):null;
-    closeSheet();
-    w(()=>dbp('trips/'+S.tid+'/plan/'+(id||rid(8))).set({day:parseInt(g('day'))||1,time:g('time'),title,note:g('note'),at:old&&old.at?old.at:Date.now(),...(old&&old.ord!=null?{ord:old.ord}:{})}));
-    S.day=parseInt(g('day'))||1;
-  }else if(kind==='rename'){
-    const id=form.dataset.id,name=g('name');if(!name)return;
-    closeSheet();
-    w(()=>q('n:'+id,()=>dbp('trips/'+S.tid+'/people/'+id).update({name})));
-  }else if(kind==='mine'){
-    saveMine(form);
-  }else if(kind==='expense'){
-    saveExpense(form);
-  }else if(kind==='addpack'){
-    const text=g('text');if(!text)return;
-    await addPack(text,S.packScope);
-    render(true);const i=$('#pk-input');if(i)i.focus();
-  }else if(kind==='addperson'){
-    const name=g('name');if(!name)return;
-    await w(()=>dbp('trips/'+S.tid+'/people/'+rid(8)).set({name,at:Date.now()}));
-    render(true);
-  }else if(kind==='addcur'){
-    const c=g('cur');const t=trip();if(!c)return;
-    w(()=>q('t:'+S.tid,()=>dbp('trips/'+S.tid).update({currencies:(t.currencies||[]).concat([c])})));
-  }else if(kind==='trip'){
-    const minDays=Math.max(1,...S.td.plan.map(p=>p.day||1));
-    const data={name:g('name'),dest:g('dest'),start:g('start'),days:Math.max(minDays,Math.min(60,parseInt(g('days'))||1))};
-    if(!data.name)return;
-    closeSheet();w(()=>q('t:'+S.tid,()=>dbp('trips/'+S.tid).update(data)));
-  }else if(kind==='ovcur'){
-    const cur=g('cur');const fx=Object.assign({},S.fx||{});
-    form.querySelectorAll('[data-fx]').forEach(i=>{const v=parseFloat(i.value);if(v>0)fx[i.dataset.fx]=v;});
-    S.fx=fx;S.ovCur=cur;ls('tb-fx',JSON.stringify(fx));ls('tb-ovcur',cur);
-    closeSheet();render(true);
-  }else if(kind==='copy'){
-    const src=form.dataset.src;const o={name:g('name'),start:g('start'),withPlan:!!fd.get('withPlan'),withPack:!!fd.get('withPack'),withPeople:!!fd.get('withPeople'),withRates:!!fd.get('withRates')};
-    if(!o.name)return;
-    closeSheet();toast('複製中…');
-    const tid=await w(()=>copyTrip(src,o));if(tid)go(tid);
-  }
-});
-document.addEventListener('input',ev=>{
-  const i=ev.target.closest&&ev.target.closest('[data-est]');if(!i)return;
-  const n=Math.max(0,Math.min(365,parseFloat(i.value)||0));S.estDays=n;
-  const out=document.getElementById(i.dataset.for);
-  if(out)out.textContent=money(n*parseFloat(i.dataset.perday),i.dataset.cur);
-});
-document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&!$('#layer').hidden)closeSheet();});
-
-boot();
-})();
-
-if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol)){addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}
-</script>
-
-</body></html>
+    case 'home-tab':S.homeTab=d.v;if(d.v==='ov')ensureOv();
