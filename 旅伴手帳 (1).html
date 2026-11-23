@@ -1,0 +1,1360 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>旅伴手帳</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one column, bottom tab bar (行程 / 行李 / 記帳 / 設定), every form opens as a bottom sheet.
+   Signature: boarding-pass cards with a perforated stub that carries the room code. */
+:root{
+  --bg:#d7e8f8; --surface:#ffffff; --surface2:#e8f1fa; --ink:#2f3a5c; --muted:#52607f; --line:#c3d6ea;
+  --accent:#6a54b0; --accent-ink:#ffffff; --accent-soft:#e4e6fa; --accent2:#c9608a;
+  --c1:#f4a6bd; --c2:#f6d77a; --c3:#a8d8a0; --c4:#9fcdf0; --c5:#f7b999; --c6:#c0b0ec;
+  --warn:#9a6212; --warn-soft:#fdf0d2; --good:#2f8a5f; --bad:#c4455f; --bad-soft:#fde4ea;
+  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-mono:"DM Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:12px; --tab-h:58px; --shadow:0 1px 2px rgba(70,110,160,.10),0 6px 16px rgba(70,110,160,.12);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#172338; --surface:#1f3150; --surface2:#2a4068; --ink:#eaf2fb; --muted:#a8bbd5; --line:#34507a;
+    --accent:#c4b5f5; --accent-ink:#2a2040; --accent-soft:#34406e; --accent2:#f0a3bf;
+  --c1:#f4a6bd; --c2:#f1d27c; --c3:#a8d8a0; --c4:#9fcdf0; --c5:#f7b999; --c6:#c0b0ec;
+    --warn:#f1c27a; --warn-soft:#3d3220; --good:#8fd8b0; --bad:#f4a0b3; --bad-soft:#44263a;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#172338; --surface:#1f3150; --surface2:#2a4068; --ink:#eaf2fb; --muted:#a8bbd5; --line:#34507a;
+  --accent:#c4b5f5; --accent-ink:#2a2040; --accent-soft:#34406e; --accent2:#f0a3bf;
+  --c1:#f4a6bd; --c2:#f1d27c; --c3:#a8d8a0; --c4:#9fcdf0; --c5:#f7b999; --c6:#c0b0ec;
+  --warn:#f1c27a; --warn-soft:#3d3220; --good:#8fd8b0; --bad:#f4a0b3; --bad-soft:#44263a;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:10}
+body.lock{overflow:hidden}
+#app{max-width:640px;margin:0 auto;min-height:60vh}
+h1,h2,h3,p{margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono,.code{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.num{font-variant-numeric:tabular-nums}
+
+/* buttons & inputs */
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 16px;min-height:44px;font-weight:500}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn.danger.armed{background:var(--bad);color:var(--surface)}
+.btn.small{min-height:34px;padding:5px 12px;font-size:13px}
+.link{background:none;border:0;color:var(--accent);padding:4px 0;font-size:13px;text-align:left}
+.icon,.x{background:none;border:0;color:var(--muted);width:36px;height:36px;border-radius:8px;flex:none}
+.x.armed{color:var(--surface);background:var(--bad);width:auto;padding:0 10px;font-size:12px}
+label.f{display:block}
+label.f>span,.lbl{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+input[type=text],input[type=number],input[type=date],input[type=time],select,textarea{
+  width:100%;min-height:44px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:16px}
+textarea{min-height:70px;resize:vertical}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.stack{display:grid;gap:14px}
+.actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:6px}
+.actions .grow{margin-right:auto}
+
+/* top bar */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;align-items:center;gap:8px;padding:10px 0}
+.back{display:grid;place-items:center;width:36px;height:36px;border-radius:8px;font-size:26px;line-height:1;text-decoration:none;color:var(--ink);flex:none}
+.ttl{min-width:0;flex:1}
+.ttl b{display:block;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ttl small{color:var(--muted);font-size:12px}
+.tag{display:flex;flex-direction:column;align-items:center;border:1.5px dashed var(--accent);border-radius:8px;background:var(--accent-soft);padding:3px 10px;color:var(--accent);flex:none}
+.tag span{font-size:10px;letter-spacing:.08em}
+.tag b{font-family:var(--f-mono);font-size:15px;letter-spacing:.08em}
+
+.page{padding-bottom:calc(var(--tab-h) + 96px + env(safe-area-inset-bottom,0px));display:grid;gap:14px}
+.hero{padding:28px 0 6px}
+.hero h1{font-size:28px;letter-spacing:.02em}
+.hero p{color:var(--muted);margin-top:6px;max-width:34em}
+.cta{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 6px}
+.sec{font-size:13px;color:var(--muted);font-weight:500;letter-spacing:.06em;margin:22px 0 8px}
+.empty{padding:28px 16px;text-align:center;color:var(--muted);border:1.5px dashed var(--line);border-radius:var(--r)}
+.note{padding:10px 12px;border-radius:10px;font-size:13px;margin:6px 0}
+.note.warn{background:var(--warn-soft);color:var(--warn)}
+.note.bad{background:var(--bad-soft);color:var(--bad)}
+
+/* boarding pass */
+.passes{display:grid;gap:12px}
+.pass{display:flex;background:var(--surface);border-radius:var(--r);box-shadow:var(--shadow);position:relative;overflow:hidden}
+.pass-main{flex:1;min-width:0;padding:16px;text-decoration:none;color:var(--ink);display:grid;gap:2px;align-content:center}
+.pass-name{font-size:18px;font-weight:700;overflow-wrap:anywhere}
+.pass-sub{color:var(--muted);font-size:13px}
+.pass-stub{width:132px;flex:none;padding:12px;border-left:2px dashed var(--line);display:grid;gap:2px;align-content:center;justify-items:start;position:relative}
+.pass-stub::before,.pass-stub::after{content:"";position:absolute;left:-9px;width:16px;height:16px;border-radius:50%;background:var(--bg)}
+.pass-stub::before{top:-9px}.pass-stub::after{bottom:-9px}
+.lab{font-size:11px;color:var(--muted);letter-spacing:.08em}
+.pass-stub .code{font-size:20px;font-weight:500;letter-spacing:.1em;color:var(--accent)}
+
+/* cards */
+.card{background:var(--surface);border-radius:var(--r);box-shadow:var(--shadow);padding:14px 16px}
+.card h3{font-size:14px;color:var(--muted);font-weight:500;margin-bottom:10px;letter-spacing:.04em}
+.row{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line)}
+.row:first-of-type{border-top:0}
+.row .grow{flex:1;min-width:0}
+.sub{font-size:12px;color:var(--muted)}
+
+/* days */
+.days{display:flex;gap:8px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:thin}
+.day{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:6px 12px;text-align:left;min-width:84px;position:relative}
+.day b{display:block;font-size:14px}.day small{font-size:11px;color:var(--muted)}
+.day.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}.day.on small{color:inherit;opacity:.85}
+.day.today::after{content:"今天";position:absolute;top:-7px;right:6px;background:var(--warn);color:var(--surface);font-size:10px;border-radius:6px;padding:0 5px}
+.day.add{border-style:dashed;color:var(--accent);display:grid;place-items:center}
+.item{display:flex;gap:12px;width:100%;text-align:left;background:var(--surface);border:0;border-radius:var(--r);box-shadow:var(--shadow);padding:12px 14px;margin-bottom:10px}
+.item .t{font-family:var(--f-mono);font-size:13px;color:var(--accent);width:46px;flex:none;padding-top:2px}
+.item b{display:block;overflow-wrap:anywhere}
+.item .n{color:var(--muted);font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
+
+/* packing */
+.prog{height:8px;border-radius:99px;background:var(--surface2);overflow:hidden;margin:8px 0 4px}
+.prog i{display:block;height:100%;background:var(--accent);border-radius:99px}
+.chk{display:flex;align-items:center;gap:12px;flex:1;min-width:0;padding:6px 0;cursor:pointer}
+.chk input{position:absolute;opacity:0;width:1px;height:1px}
+.box{width:24px;height:24px;border-radius:7px;border:2px solid var(--line);flex:none;display:grid;place-items:center;background:var(--surface)}
+.chk input:checked+.box{background:var(--accent);border-color:var(--accent)}
+.chk input:checked+.box::after{content:"";width:6px;height:11px;border:solid var(--accent-ink);border-width:0 2.5px 2.5px 0;transform:rotate(45deg) translate(-1px,-1px)}
+.chk input:focus-visible+.box{outline:2px solid var(--accent);outline-offset:2px}
+.txt{overflow-wrap:anywhere}.txt.done{color:var(--muted);text-decoration:line-through}
+.addrow{display:flex;gap:8px}.addrow input{flex:1}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.seg button{flex:1;border:0;background:none;padding:9px 8px;min-height:40px;font-size:14px}
+.seg button.on{background:var(--accent);color:var(--accent-ink);font-weight:500}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:6px 14px;font-size:14px;min-height:36px}
+.chip.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:500}
+.chip.ghost{border-style:dashed;color:var(--muted)}
+
+/* money */
+.big{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl th{font-size:12px;color:var(--muted);font-weight:500;text-align:right;padding:4px 0}
+.tbl td{padding:7px 0;border-top:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums}
+.tbl th:first-child,.tbl td:first-child{text-align:left}
+.tblwrap{overflow-x:auto}
+.pos{color:var(--good)}.neg{color:var(--bad)}
+.xfer{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+.xfer:first-of-type{border-top:0}
+.xfer .who{flex:1;min-width:140px}
+.xfer .amt{font-weight:700;font-variant-numeric:tabular-nums}
+.bar{display:grid;grid-template-columns:56px 1fr auto;gap:10px;align-items:center;font-size:13px;margin:6px 0}
+.bar i{display:block;height:10px;border-radius:99px;background:var(--accent);min-width:3px}
+.exp{display:flex;gap:10px;width:100%;text-align:left;background:var(--surface);border:0;border-radius:var(--r);box-shadow:var(--shadow);padding:12px 14px;margin-bottom:10px;align-items:center}
+.exp .grow{flex:1;min-width:0}.exp b{display:block;overflow-wrap:anywhere}
+.exp .r{text-align:right;font-variant-numeric:tabular-nums;flex:none}
+.exp .r small{display:block;color:var(--muted);font-size:12px}
+.tagx{display:inline-block;font-size:11px;border-radius:6px;padding:0 6px;background:var(--surface2);color:var(--muted);margin-left:6px}
+.rate{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+.rate:first-of-type{border-top:0}
+.rate input{width:110px;min-height:38px}
+.crow{display:flex;align-items:center;gap:10px;margin-bottom:8px}.crow span{flex:1;min-width:0;overflow-wrap:anywhere}.crow input{width:130px}
+.hint{font-size:13px;color:var(--muted);margin-top:4px}.hint.bad{color:var(--bad)}.hint.good{color:var(--good)}
+
+/* tab bar, fab, sheet, toast */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabbar>div{max-width:640px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+.tabbar button{border:0;background:none;height:var(--tab-h);display:grid;place-items:center;align-content:center;gap:2px;font-size:12px;color:var(--muted)}
+.tabbar button.on{color:var(--accent);font-weight:700}
+.tabbar svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.fab{position:fixed;z-index:15;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(var(--tab-h) + env(safe-area-inset-bottom,0px) + 14px);
+  background:var(--accent);color:var(--accent-ink);border:0;border-radius:99px;padding:0 20px;height:48px;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+#layer{position:fixed;inset:0;z-index:30}
+.scrim{position:absolute;inset:0;background:rgba(8,20,26,.55)}
+#sheet{position:absolute;left:0;right:0;bottom:0;max-width:640px;margin:0 auto;max-height:92%;overflow:auto;background:var(--surface);
+  border-radius:18px 18px 0 0;padding:14px max(16px,env(safe-area-inset-left,0px)) calc(24px + env(safe-area-inset-bottom,0px));box-shadow:0 -8px 30px rgba(0,0,0,.25)}
+.sh-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.sh-head h2{font-size:18px}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--tab-h) + env(safe-area-inset-bottom,0px) + 74px);background:var(--ink);color:var(--bg);
+  padding:10px 16px;border-radius:10px;z-index:40;font-size:14px;max-width:min(92vw,520px);text-align:center}
+.ticket{display:grid;justify-items:center;gap:4px;padding:18px;border:2px dashed var(--accent);border-radius:var(--r);background:var(--accent-soft);color:var(--accent)}
+.ticket .code{font-size:34px;font-weight:500;letter-spacing:.18em}
+.hero h1{color:var(--accent);background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.fab{background:var(--accent);color:var(--accent-ink);box-shadow:0 6px 16px rgba(122,100,192,.35)}
+.day.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.card h3{color:var(--accent)}
+.tagx{background:var(--accent-soft);color:var(--accent)}
+.prog i{background:linear-gradient(90deg,var(--c3),var(--c4))}
+.pass{border-top:5px solid var(--c1)}
+.pass:nth-child(6n+2){border-top-color:var(--c4)}.pass:nth-child(6n+3){border-top-color:var(--c3)}
+.pass:nth-child(6n+4){border-top-color:var(--c2)}.pass:nth-child(6n+5){border-top-color:var(--c5)}.pass:nth-child(6n+6){border-top-color:var(--c6)}
+.pass-stub{background:linear-gradient(160deg,var(--accent-soft),var(--surface))}
+.bar i{background:var(--c1)}
+.bar:nth-of-type(6n+2) i{background:var(--c4)}.bar:nth-of-type(6n+3) i{background:var(--c3)}
+.bar:nth-of-type(6n+4) i{background:var(--c2)}.bar:nth-of-type(6n+5) i{background:var(--c5)}.bar:nth-of-type(6n+6) i{background:var(--c6)}
+.item{border-left:5px solid var(--c4)}
+.item:nth-child(4n+1){border-left-color:var(--c1)}.item:nth-child(4n+2){border-left-color:var(--c2)}.item:nth-child(4n+3){border-left-color:var(--c3)}
+.ov{display:grid;gap:12px}
+.ovc{display:grid;gap:10px;width:100%;text-align:left;border:0;border-top:5px solid var(--c1);background:var(--surface);border-radius:var(--r);box-shadow:var(--shadow);padding:14px 16px;color:var(--ink)}
+.ovc:nth-child(6n+2){border-top-color:var(--c4)}.ovc:nth-child(6n+3){border-top-color:var(--c3)}
+.ovc:nth-child(6n+4){border-top-color:var(--c2)}.ovc:nth-child(6n+5){border-top-color:var(--c5)}.ovc:nth-child(6n+6){border-top-color:var(--c6)}
+.ovh{display:flex;justify-content:space-between;align-items:baseline;gap:4px 10px;flex-wrap:wrap}
+.ovh b{font-size:16px;overflow-wrap:anywhere}
+.ovbar{height:10px;border-radius:99px;background:var(--surface2);overflow:hidden}
+.ovbar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+.kv{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kv>div{min-width:0}.kv small{display:block;font-size:11px;color:var(--muted)}
+.kv b{display:block;font-size:15px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.est{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--accent-soft)}
+.ovctl{display:grid;gap:10px;margin:8px 0 4px}
+.est input{width:76px;min-height:38px;text-align:center}
+.est b{font-size:18px;font-variant-numeric:tabular-nums;color:var(--accent)}
+.pass::before,.pass::after{content:"";position:absolute;top:calc(50% - 9px);width:18px;height:18px;border-radius:50%;background:var(--bg)}
+.pass::before{left:-9px}.pass::after{right:-9px}
+.pass-main .lab{letter-spacing:.14em;font-size:10px;color:var(--accent)}
+.pass-stub .bc{display:block;width:100%;height:16px;margin:4px 0 2px;border-radius:2px;opacity:.5;background:repeating-linear-gradient(90deg,var(--ink) 0 2px,transparent 2px 4px,var(--ink) 4px 5px,transparent 5px 8px)}
+.item{align-items:center}
+.itemmain{display:flex;gap:12px;flex:1;min-width:0;background:none;border:0;padding:0;text-align:left;color:inherit}
+.itemmain .tx{min-width:0;display:block}
+.mv{display:flex;flex-direction:column;gap:2px;flex:none}
+.x:disabled{opacity:.25;cursor:default}
+.cmp{display:grid;gap:4px;padding:8px 0;border-top:1px solid var(--line)}
+.cmp:first-of-type{border-top:0}
+.cmph{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.cmph b{overflow-wrap:anywhere}
+.no{flex:none;width:26px;height:26px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:13px;display:grid;place-items:center;font-variant-numeric:tabular-nums}
+@media (max-width:420px){.pass-stub{width:112px}.two{grid-template-columns:1fr}.two.keep{grid-template-columns:1fr 1fr}}
+@media (prefers-reduced-motion:no-preference){.fab,.btn,.chip{transition:transform .08s}.fab:active,.btn:active{transform:scale(.97)}}
+</style>
+
+<div id="app"><div class="empty" style="margin-top:40px">載入中…</div></div>
+<div id="layer" hidden><div class="scrim" data-act="close-sheet"></div><div id="sheet" role="dialog" aria-modal="true"></div></div>
+<div id="toast" hidden></div>
+
+<script>
+(function(){
+'use strict';
+const $=(s,r=document)=>r.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rid=(n=8)=>{const a='abcdefghijklmnopqrstuvwxyz0123456789';const u=new Uint8Array(n);crypto.getRandomValues(u);let s='';for(const b of u)s+=a[b%36];return s;};
+const CODE_AL='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const genCode=()=>{const u=new Uint8Array(6);crypto.getRandomValues(u);let s='';for(const b of u)s+=CODE_AL[b%CODE_AL.length];return s;};
+
+const CUR={TWD:['新台幣','NT$',0],JPY:['日圓','¥',0],KRW:['韓元','₩',0],USD:['美元','US$',2],EUR:['歐元','€',2],THB:['泰銖','฿',2],CNY:['人民幣','CN¥',2],HKD:['港幣','HK$',2],SGD:['新加坡幣','S$',2],MYR:['馬來西亞令吉','RM',2],VND:['越南盾','₫',0],GBP:['英鎊','£',2],AUD:['澳幣','A$',2]};
+const cname=c=>CUR[c]?CUR[c][0]:c;
+const cdec=c=>CUR[c]?CUR[c][2]:2;
+function money(n,cur){
+  const d=cdec(cur);
+  const s=new Intl.NumberFormat('zh-TW',{minimumFractionDigits:d,maximumFractionDigits:d}).format(Math.abs(n));
+  return (n<0?'-':'')+(CUR[cur]?CUR[cur][1]:cur+' ')+s;
+}
+const SUGGEST=['護照／證件','手機與充電線','行動電源','轉接插頭','換洗衣物','盥洗用品','常用藥品','雨具','現金與信用卡','網卡／eSIM','口罩','防曬用品','拖鞋','耳機'];
+const CATS=['餐飲','交通','機票','住宿','門票','購物','其他'];
+const FT=['來回','去程','回程','單程'];
+const DESTS=['日本','韓國','泰國','越南','新加坡','馬來西亞','香港','中國','美國','英國','歐洲','澳洲','台灣'];
+function destField(val,label){
+  val=(val||'').trim();
+  const preset=DESTS.includes(val),custom=!!val&&!preset;
+  const opts='<option value="">不選擇</option>'+DESTS.map(d=>'<option value="'+d+'"'+(val===d?' selected':'')+'>'+d+'</option>').join('')+'<option value="__other"'+(custom?' selected':'')+'>其他（自己填）</option>';
+  return '<div><div class="lbl">'+label+'</div><select data-dest-sel>'+opts+'</select><input type="text" name="dest" maxlength="40" placeholder="自己填目的地" style="margin-top:8px" value="'+esc(val)+'"'+(custom?'':' hidden')+'></div>';
+}
+
+//#LEDGER-START
+/* Pure ledger: everything is computed in integer cents of the trip's base currency. */
+function computeLedger(trip,people,spend){
+  const base=trip.base, rates=trip.rates||{};
+  const net={},paid={},owed={};
+  people.forEach(p=>{net[p.id]=0;paid[p.id]=0;owed[p.id]=0;});
+  let total=0,missing=0;
+  const byCur={},byCat={},missingCur={};
+  for(const e of spend){
+    const r=e.cur===base?1:Number(rates[e.cur]);
+    if(!(r>0)){missing++;missingCur[e.cur]=1;continue;}
+    const cents=x=>Math.round(x*r*100);
+    const shares={};let tot=0,orig=0;
+    if(e.mode==='custom'){
+      for(const pid in (e.custom||{})){const a=Number(e.custom[pid])||0;const c=cents(a);if(c>0){shares[pid]=c;tot+=c;orig+=a;}}
+    }else if(e.mode==='treat'){
+      tot=cents(e.amount);orig=Number(e.amount);shares[e.payer]=tot;
+    }else{
+      const among=(e.among||[]).filter(id=>id in net).sort();
+      if(!among.length)continue;
+      tot=cents(e.amount);orig=Number(e.amount);
+      const b=Math.floor(tot/among.length);let rem=tot-b*among.length;
+      among.forEach(id=>{shares[id]=b+(rem>0?1:0);if(rem>0)rem--;});
+    }
+    if(!(e.payer in net))continue;
+    const isT=e.mode==='transfer';
+    net[e.payer]+=tot;
+    if(!isT)paid[e.payer]+=tot;
+    for(const pid in shares){if(!(pid in net))continue;net[pid]-=shares[pid];if(!isT)owed[pid]+=shares[pid];}
+    if(!isT&&e.settled){for(const pid in shares){if(pid!==e.payer&&e.settled[pid]&&(pid in net)){net[e.payer]-=shares[pid];net[pid]+=shares[pid];}}}
+    if(!isT){
+      total+=tot;
+      byCur[e.cur]=(byCur[e.cur]||0)+orig;
+      const k=e.cat||'其他';byCat[k]=(byCat[k]||0)+tot;
+    }
+  }
+  const cr=[],db=[];
+  for(const id in net){if(net[id]>0)cr.push([id,net[id]]);else if(net[id]<0)db.push([id,-net[id]]);}
+  const transfers=[];
+  while(cr.length&&db.length){
+    cr.sort((a,b)=>b[1]-a[1]);db.sort((a,b)=>b[1]-a[1]);
+    const a=Math.min(cr[0][1],db[0][1]);
+    transfers.push({from:db[0][0],to:cr[0][0],cents:a});
+    cr[0][1]-=a;db[0][1]-=a;
+    if(cr[0][1]===0)cr.shift();
+    if(db[0][1]===0)db.shift();
+  }
+  const dec=CUR[base]?CUR[base][2]:2;
+  const shown=transfers.filter(t=>dec===0?Math.round(t.cents/100)>0:t.cents>=1);
+  return {net,paid,owed,total,missing,missingCur,byCur,byCat,transfers:shown};
+}
+//#LEDGER-END
+
+const S={ovCur:'TWD',ovTrip:'all',fx:{},ready:false,uid:null,canWrite:null,trips:{},mine:{},tripsLoaded:false,mineLoaded:false,tid:null,
+  td:{people:[],plan:[],pack:[],spend:[],pub:[]},unsubs:[],tab:'plan',day:1,packScope:'me',armed:null,dirty:false,slow:false,err:null,db:null,user:null};
+
+/* ---------- small helpers ---------- */
+let toastT=null;
+function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true;},3200);}
+function errMsg(e){
+  const c=e&&e.code;
+  if(c==='invalid_argument')return '沒有編輯權限。請房主把你設為可編輯內容的成員（Contributor）。';
+  if(c==='quota_exceeded')return '資料量已達上限，請先刪除不需要的項目。';
+  if(c==='resource_exhausted')return '操作太頻繁，請稍等一下再試。';
+  return '儲存失敗，請確認網路後再試一次。';
+}
+async function w(fn){try{return await fn();}catch(e){toast(errMsg(e));return undefined;}}
+const chains={};
+function q(key,fn){const p=(chains[key]||Promise.resolve()).then(()=>fn());chains[key]=p.catch(()=>{});return p;}
+const trip=()=>S.trips[S.tid];
+const P=()=>S.mine[S.tid]||{};
+const people=()=>S.td.people.slice().sort((a,b)=>(a.at||0)-(b.at||0));
+const pname=id=>{const p=S.td.people.find(x=>x.id===id);return p?p.name:'（已移除）';};
+const meId=()=>P().me||null;
+const dbp=p=>S.db.doc(p);
+function addDays(s,k){const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d+k);}
+const WD='日一二三四五六';
+function dayLabel(t,i){if(!t.start)return '';const d=addDays(t.start,i-1);return (d.getMonth()+1)+'/'+d.getDate()+' 週'+WD[d.getDay()];}
+function isToday(t,i){if(!t.start)return false;const d=addDays(t.start,i-1),n=new Date();return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate();}
+function rangeLabel(t){if(!t.start)return '';const a=addDays(t.start,0),b=addDays(t.start,(t.days||1)-1);const f=d=>(d.getMonth()+1)+'/'+d.getDate();return a.getTime()===b.getTime()?f(a):f(a)+'–'+f(b);}
+function tripMeta(t){return [t.dest,rangeLabel(t),(t.days||1)+' 天'].filter(Boolean).join(' · ');}
+const dec=cur=>cdec(cur);
+function armed(key){return S.armed===key;}
+function arm(key,run){
+  if(S.armed===key){S.armed=null;run();return;}
+  S.armed=key;render(true);
+  setTimeout(()=>{if(S.armed===key){S.armed=null;render();}},3000);
+}
+function newCode(){let c;do{c=genCode();}while(Object.values(S.trips).some(t=>t.code===c));return c;}
+function ls(k,v){try{if(v===undefined)return localStorage.getItem(k)||'';localStorage.setItem(k,v);}catch(e){return '';}}
+
+/* ---------- boot & subscriptions ---------- */
+async function boot(){
+  try{S.fx=JSON.parse(ls('tb-fx')||'{}')||{};}catch(e){S.fx={};}
+  S.ovCur=ls('tb-ovcur')||'TWD';
+  render();
+  const C=window.claude;
+  if(!C||!C.use){S.ready='nodb';render();return;}
+  let db=null,user=null;
+  try{[db,user]=await Promise.all([C.use('db'),C.use('user')]);}catch(e){}
+  if(!db||!user){S.ready='nodb';render();return;}
+  S.db=db;S.user=user;
+  S.uid=await user.id();
+  if(!S.uid){S.ready='nodb';render();return;}
+  try{S.canWrite=await user.can('data.write');}catch(e){S.canWrite=null;}
+  const slow=setTimeout(()=>{S.slow=true;render();},10000);
+  const check=()=>{if(S.tripsLoaded&&S.mineLoaded){clearTimeout(slow);S.slow=false;S.ready=true;}};
+  const onErr=e=>{S.err='無法讀取資料（'+((e&&e.code)||'錯誤')+'）。請重新整理頁面。';render();};
+  db.collection('trips').onSnapshot(snap=>{const m={};snap.docs.forEach(d=>{m[d.id]=d.data();});S.trips=m;S.tripsLoaded=true;check();sched();},onErr);
+  db.collection('data/users/'+S.uid).onSnapshot(snap=>{const m={};snap.docs.forEach(d=>{m[d.id]=d.data();});S.mine=m;S.mineLoaded=true;check();sched();},onErr);
+  window.addEventListener('hashchange',route);
+  route();
+}
+function route(){
+  const m=location.hash.match(/^#t-([A-Za-z0-9]+)$/);
+  const tid=m?m[1]:null;
+  if(tid===S.tid){render();return;}
+  closeTrip();
+  closeSheet();
+  if(tid&&S.db)openTrip(tid);
+  S.tid=tid;S.tab=S.nextTab||'plan';S.nextTab=null;S.day=1;S.armed=null;
+  window.scrollTo(0,0);
+  render(true);
+}
+function closeTrip(){S.unsubs.forEach(u=>{try{u();}catch(e){}});S.unsubs=[];S.td={people:[],plan:[],pack:[],spend:[],pub:[]};}
+function openTrip(tid){
+  S.td={people:[],plan:[],pack:[],spend:[],pub:[]};
+  for(const k of ['people','plan','pack','spend','pub']){
+    S.unsubs.push(S.db.collection('trips/'+tid+'/'+k).onSnapshot(snap=>{
+      S.td[k]=snap.docs.map(d=>Object.assign({id:d.id},d.data()));sched();
+    },e=>{S.err='無法讀取旅行資料（'+((e&&e.code)||'錯誤')+'）。';render();}));
+  }
+}
+let raf=0;function sched(){if(raf)return;raf=requestAnimationFrame(()=>{raf=0;if(S.homeTab==='ov'&&!S.tid)ensureOv();render();});}
+
+/* ---------- rendering ---------- */
+function render(force){
+  const app=$('#app');
+  const a=document.activeElement;
+  if(!force&&a&&app.contains(a)&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.type!=='checkbox'){S.dirty=true;return;}
+  S.dirty=false;
+  const y=window.scrollY;
+  app.innerHTML=view();
+  window.scrollTo(0,y);
+}
+document.addEventListener('focusout',()=>{setTimeout(()=>{if(S.dirty)render();},0);});
+
+function banner(){
+  let h='';
+  if(S.canWrite===false)h+='<div class="note warn">你目前只有檢視權限，無法新增或修改內容。請房主把你設為可編輯內容的成員（Contributor）。</div>';
+  if(S.slow&&!S.ready)h+='<div class="note warn">連線比較慢，資料可能還沒更新。</div>';
+  if(S.err)h+='<div class="note bad">'+esc(S.err)+'</div>';
+  return h;
+}
+function view(){
+  if(S.ready==='nodb')return '<section class="hero"><h1>旅伴手帳</h1><p>這個頁面需要登入 Claude 才能儲存與共用旅行資料。請登入後，再用朋友分享給你的連結開啟。</p></section>';
+  if(!S.ready)return banner()+'<div class="empty" style="margin-top:40px">載入中…</div>';
+  return S.tid?tripView():homeView();
+}
+
+/* home */
+function homeSeg(){const v=S.homeTab==='ov'?'ov':'trips';return '<div class="seg" role="group" aria-label="首頁分頁" style="margin:10px 0 4px"><button data-act="home-tab" data-v="trips" class="'+(v==='trips'?'on':'')+'">我的旅行</button><button data-act="home-tab" data-v="ov" class="'+(v==='ov'?'on':'')+'">花費總覽</button></div>';}
+function homeView(){return S.homeTab==='ov'?banner()+'<section class="hero"><h1>花費總覽</h1><p>每趟旅行我花了多少，可以拿來比較，或估算下次要準備多少錢。</p></section>'+homeSeg()+ovView():homeTrips();}
+function ensureOv(){
+  if(!S.db||!S.uid)return;
+  S.ov=S.ov||{};S.ovSubs=S.ovSubs||{};
+  const ids=Object.keys(S.mine).filter(id=>S.trips[id]).sort((a,b)=>(S.mine[b].joinedAt||0)-(S.mine[a].joinedAt||0)).slice(0,20);
+  ids.forEach(id=>{
+    if(S.ovSubs[id])return;
+    const o=S.ov[id]={pl:null,sp:null};
+    S.ovSubs[id]=[
+      S.db.collection('trips/'+id+'/people').onSnapshot(s=>{o.pl=s.docs.map(d=>Object.assign({id:d.id},d.data()));sched();},()=>{}),
+      S.db.collection('trips/'+id+'/spend').onSnapshot(s=>{o.sp=s.docs.map(d=>Object.assign({id:d.id},d.data()));sched();},()=>{})
+    ];
+  });
+}
+function ovStats(id){
+  const t=S.trips[id],o=(S.ov||{})[id],m=S.mine[id]||{};
+  if(!t||!o||!o.pl||!o.sp)return null;
+  const cs=S.ovCats&&S.ovCats.length?S.ovCats:null;
+  const inC=e=>!cs||cs.includes(e.cat||'其他');
+  const L=computeLedger(t,o.pl,o.sp.filter(inC));
+  const share=m.me?(L.owed[m.me]||0)/100:0;
+  const M=mineSum((m.mine||[]).filter(inC),t);
+  const catMine=cat=>{const ps=mineSum((m.mine||[]).filter(e=>e.cat===cat),t).sum;
+    const sh=m.me?((computeLedger(t,o.pl,o.sp.filter(e=>e.cat===cat)).owed[m.me])||0)/100:0;return ps+sh;};
+  const days=Math.max(1,t.days||1);
+  const flights=[];
+  (m.mine||[]).filter(e=>e.cat==='機票').forEach(e=>{const r=e.cur===t.base?1:Number((t.rates||{})[e.cur]);if(r>0)flights.push({title:e.title,ft:e.ft||'',amt:Math.round(e.amount*r*100)/100});});
+  if(m.me)o.sp.filter(e=>e.cat==='機票'&&e.mode!=='transfer').forEach(e=>{const sh=((computeLedger(t,o.pl,[e]).owed[m.me])||0)/100;if(sh>0)flights.push({title:e.title,ft:e.ft||'',amt:sh});});
+  return {base:t.base,mine:M.sum+share,group:L.total/100,days,nights:Math.max(1,days-1),flights,lodging:catMine('住宿'),missing:L.missing+M.missing};
+}
+function flightItems(rows){
+  const items=[];
+  rows.forEach(r=>{
+    const tn=S.trips[r.id].name,fl=(r.st&&r.st.flights)||[];const s0=items.length;
+    const rt=fl.filter(f=>f.ft==='來回'),go=fl.filter(f=>f.ft==='去程'),bk=fl.filter(f=>f.ft==='回程'),one=fl.filter(f=>f.ft!=='來回'&&f.ft!=='去程'&&f.ft!=='回程');
+    rt.forEach(f=>items.push({trip:tn,title:f.title,kind:'來回',total:f.amt,legs:2}));
+    const n=Math.min(go.length,bk.length);
+    for(let i=0;i<n;i++)items.push({trip:tn,title:go[i].title+' ＋ '+bk[i].title,kind:'去程＋回程',total:go[i].amt+bk[i].amt,legs:2});
+    go.slice(n).forEach(f=>items.push({trip:tn,title:f.title,kind:'只有去程',total:f.amt,legs:1,partial:true}));
+    bk.slice(n).forEach(f=>items.push({trip:tn,title:f.title,kind:'只有回程',total:f.amt,legs:1,partial:true}));
+    one.forEach(f=>items.push({trip:tn,title:f.title,kind:'單程',total:f.amt,legs:1}));
+    items.slice(s0).forEach(x=>{x.days=r.st.days;x.rid=r.id;});
+  });
+  items.forEach(x=>{x.per=x.total/x.legs;});
+  return items;
+}
+function flightCard(c,rows){
+  const all=flightItems(rows);
+  if(!all.length)return '';
+  all.sort((a,b)=>a.per-b.per);
+  const mxv=all[all.length-1].per||1;
+  const full=all.filter(x=>!x.partial);
+  const low=full.length>1?full[0]:null;
+  return '<section class="card"><h3>機票比較（'+c+'）</h3>'+all.map(x=>'<div class="cmp"><div class="cmph"><b>'+esc(x.trip)+' · '+esc(x.title)+'<span class="tagx">'+x.kind+'</span>'+(x===low?'<span class="tagx">最低</span>':'')+'</b><span class="num">'+money(x.total,c)+'</span></div><div class="ovbar"><i style="width:'+Math.max(3,Math.round(x.per/mxv*100))+'%"></i></div><div class="sub">'+(x.legs===2?'共 2 段，每段約 '+money(x.per,c):(x.partial?'只記了這一段，沒有'+(x.kind==='只有去程'?'回程':'去程')+'，這是單段價格':'單程，每段 '+money(x.per,c)))+'</div></div>').join('')+'<div class="sub" style="margin-top:6px">所有旅行的機票放在一起，依每段價格由低到高排列。來回票與「去程＋回程」都除以 2 比較；只記了去程或回程的會標示出來，價格只代表那一段，不參與「最低」標記。含個人記帳與共同分帳中你的份。</div></section>';
+}
+function compareCard(c,rows){
+  const item=S.cmpItem==='lodge'?'lodge':'flight';
+  const basis=['total','avg','day'].includes(S.cmpBasis)?S.cmpBasis:'avg';
+  const view=S.cmpView==='list'?'list':'sum';
+  const unit=item==='flight'?'段':'晚';
+  const list=item==='flight'
+    ?flightItems(rows).map(x=>({rid:x.rid,name:x.trip+' · '+x.title,tag:x.kind,partial:!!x.partial,total:x.total,units:x.legs,days:x.days||1,miss:x.kind==='只有去程'?'回程':'去程'}))
+    :rows.filter(r=>r.st&&r.st.lodging>0).map(r=>({rid:r.id,name:S.trips[r.id].name,tag:'',partial:false,total:r.st.lodging,units:r.st.nights,days:r.st.days}));
+  const basisOpts=[['total','總額'],['avg','每'+unit+'平均'],['day','每天分攤']];
+  const bLabel=basisOpts.find(o=>o[0]===basis)[1];
+  const sel=(attr,opts,cur)=>'<select '+attr+'>'+opts.map(o=>'<option value="'+o[0]+'"'+(o[0]===cur?' selected':'')+'>'+o[1]+'</option>').join('')+'</select>';
+  const seg='<div class="seg" role="group" aria-label="顯示方式" style="margin-top:10px"><button data-act="cmp-view" data-v="sum" class="'+(view==='sum'?'on':'')+'">全部加在一起</button><button data-act="cmp-view" data-v="list" class="'+(view==='list'?'on':'')+'">一筆一筆看</button></div>';
+  const head='<div class="two keep"><label class="f"><span>比較項目</span>'+sel('data-cmp-item',[['flight','機票'],['lodge','住宿']],item)+'</label><label class="f"><span>比較方式</span>'+sel('data-cmp-basis',basisOpts,basis)+'</label></div>'+seg;
+  const noun=item==='flight'?'機票':'住宿';
+  let body;
+  if(!list.length)body='<div class="sub" style="margin-top:10px">這個範圍內還沒有'+noun+'記帳。</div>';
+  else if(view==='sum'){
+    const total=list.reduce((a,x)=>a+x.total,0),units=list.reduce((a,x)=>a+x.units,0);
+    const trips=[...new Set(list.map(x=>x.rid))];
+    const daysSum=trips.reduce((a,id)=>{const r=rows.find(q=>q.id===id);return a+(r&&r.st?r.st.days:0);},0);
+    const v=basis==='total'?total:basis==='avg'?total/Math.max(1,units):total/Math.max(1,daysSum);
+    const label=basis==='total'?'全部加起來的'+noun+'總額':basis==='avg'?'平均每'+unit+noun:'每天平均分攤的'+noun+'花費';
+    const partialN=list.filter(x=>x.partial).length;
+    body='<div style="margin:14px 0 6px"><div class="sub">'+label+'</div><div class="big">'+money(v,c)+'</div></div>'+
+      '<div class="kv"><div><small>涵蓋旅行</small><b>'+trips.length+' 趟</b></div><div><small>平均每趟</small><b>'+money(total/Math.max(1,trips.length),c)+'</b></div><div><small>全部總額</small><b>'+money(total,c)+'</b></div></div>'+
+      '<div class="sub" style="margin-top:8px">把選到範圍內所有旅行的'+noun+'加在一起算，共 '+list.length+' 筆'+(partialN?'，其中 '+partialN+' 筆只記了單段':'')+'。'+(item==='flight'?'來回與「去程＋回程」算 2 段。':'住宿以晚數計算。')+'想看每一筆，切到「一筆一筆看」。含個人記帳與共同分帳中你的份。</div>';
+  }else{
+    const val=x=>basis==='total'?x.total:basis==='avg'?x.total/Math.max(1,x.units):x.total/Math.max(1,x.days);
+    list.forEach(x=>{x.v=val(x);});
+    list.sort((a,b)=>a.v-b.v);
+    const full=list.filter(x=>!x.partial);
+    const avg=full.length?full.reduce((a,x)=>a+x.v,0)/full.length:0;
+    const mxv=Math.max(...list.map(x=>x.v))||1;
+    const low=full.length>1?full[0]:null;
+    const kv='<div class="kv" style="margin:12px 0 4px"><div><small>筆數</small><b>'+full.length+' 筆</b></div><div><small>平均（'+bLabel+'）</small><b>'+money(avg,c)+'</b></div><div><small>最低</small><b>'+(full.length?money(full[0].v,c):'—')+'</b></div></div>';
+    const rowsH=list.map(x=>{
+      let sub;
+      if(x.partial)sub='只記了這一段，沒有'+x.miss+'，價格只代表單段';
+      else if(basis==='total')sub=x.units+' '+unit+'，每'+unit+'約 '+money(x.total/Math.max(1,x.units),c);
+      else if(basis==='avg')sub='總額 '+money(x.total,c)+'，共 '+x.units+' '+unit;
+      else sub='總額 '+money(x.total,c)+'，分攤到 '+x.days+' 天';
+      return '<div class="cmp"><div class="cmph"><b>'+esc(x.name)+(x.tag?'<span class="tagx">'+x.tag+'</span>':'')+(x===low?'<span class="tagx">最低</span>':'')+'</b><span class="num">'+money(x.v,c)+'</span></div><div class="ovbar"><i style="width:'+Math.max(3,Math.round(x.v/mxv*100))+'%"></i></div><div class="sub">'+sub+'</div></div>';
+    }).join('');
+    body=kv+rowsH+'<div class="sub" style="margin-top:6px">'+(item==='flight'?'來回與「去程＋回程」算 2 段；只記單段的標示出來，不計入平均與最低。':'住宿以記到的住宿總額，除以旅行晚數。')+'「每天分攤」是把總額平均分到整趟旅行的天數。含個人記帳與共同分帳中你的份。</div>';
+  }
+  return '<section class="card"><h3>機票・住宿比較（'+c+'）</h3>'+head+body+'</section>';
+}
+function compareCardOld(c,rows){
+  const item=S.cmpItem==='lodge'?'lodge':'flight';
+  const basis=['total','avg','day'].includes(S.cmpBasis)?S.cmpBasis:'avg';
+  const unit=item==='flight'?'段':'晚';
+  const list=item==='flight'
+    ?flightItems(rows).map(x=>({name:x.trip+' · '+x.title,tag:x.kind,partial:!!x.partial,total:x.total,units:x.legs,days:x.days||1,miss:x.kind==='只有去程'?'回程':'去程'}))
+    :rows.filter(r=>r.st&&r.st.lodging>0).map(r=>({name:S.trips[r.id].name,tag:'',partial:false,total:r.st.lodging,units:r.st.nights,days:r.st.days}));
+  const basisOpts=[['total','總額'],['avg','每'+unit+'平均'],['day','每天分攤']];
+  const bLabel=basisOpts.find(o=>o[0]===basis)[1];
+  const val=x=>basis==='total'?x.total:basis==='avg'?x.total/Math.max(1,x.units):x.total/Math.max(1,x.days);
+  const sel=(attr,opts,cur)=>'<select '+attr+'>'+opts.map(o=>'<option value="'+o[0]+'"'+(o[0]===cur?' selected':'')+'>'+o[1]+'</option>').join('')+'</select>';
+  const head='<div class="two keep"><label class="f"><span>比較項目</span>'+sel('data-cmp-item',[['flight','機票'],['lodge','住宿']],item)+'</label><label class="f"><span>比較方式</span>'+sel('data-cmp-basis',basisOpts,basis)+'</label></div>';
+  let body;
+  if(!list.length)body='<div class="sub" style="margin-top:10px">這個範圍內還沒有'+(item==='flight'?'機票':'住宿')+'記帳。</div>';
+  else{
+    list.forEach(x=>{x.v=val(x);});
+    list.sort((a,b)=>a.v-b.v);
+    const full=list.filter(x=>!x.partial);
+    const avg=full.length?full.reduce((a,x)=>a+x.v,0)/full.length:0;
+    const mxv=Math.max(...list.map(x=>x.v))||1;
+    const low=full.length>1?full[0]:null;
+    const kv='<div class="kv" style="margin:12px 0 4px"><div><small>筆數</small><b>'+full.length+' 筆</b></div><div><small>平均（'+bLabel+'）</small><b>'+money(avg,c)+'</b></div><div><small>最低</small><b>'+(full.length?money(full[0].v,c):'—')+'</b></div></div>';
+    const rowsH=list.map(x=>{
+      let sub;
+      if(x.partial)sub='只記了這一段，沒有'+x.miss+'，價格只代表單段';
+      else if(basis==='total')sub=x.units+' '+unit+'，每'+unit+'約 '+money(x.total/Math.max(1,x.units),c);
+      else if(basis==='avg')sub='總額 '+money(x.total,c)+'，共 '+x.units+' '+unit;
+      else sub='總額 '+money(x.total,c)+'，分攤到 '+x.days+' 天';
+      return '<div class="cmp"><div class="cmph"><b>'+esc(x.name)+(x.tag?'<span class="tagx">'+x.tag+'</span>':'')+(x===low?'<span class="tagx">最低</span>':'')+'</b><span class="num">'+money(x.v,c)+'</span></div><div class="ovbar"><i style="width:'+Math.max(3,Math.round(x.v/mxv*100))+'%"></i></div><div class="sub">'+sub+'</div></div>';
+    }).join('');
+    body=kv+rowsH+'<div class="sub" style="margin-top:6px">'+(item==='flight'?'來回與「去程＋回程」算 2 段；只記單段的標示出來，不計入平均與最低。':'住宿以記到的住宿總額，除以旅行晚數。')+'「每天分攤」是把總額平均分到整趟旅行的天數。含個人記帳與共同分帳中你的份。</div>';
+  }
+  return '<section class="card"><h3>機票・住宿比較（'+c+'）</h3>'+head+body+'</section>';
+}
+function flightCardOld(c,rows){
+  const all=[];
+  rows.forEach(r=>{if(r.st&&r.st.base===c)(r.st.flights||[]).forEach(f=>all.push({trip:S.trips[r.id].name,f}));});
+  if(!all.length)return '';
+  all.forEach(x=>{x.legs=x.f.ft==='來回'?2:1;x.per=x.f.amt/x.legs;});
+  all.sort((a,b)=>a.per-b.per);
+  const mxv=all[all.length-1].per;
+  return '<section class="card"><h3>機票比較（'+c+'）</h3>'+all.map((x,i)=>'<div class="cmp"><div class="cmph"><b>'+esc(x.trip)+' · '+esc(x.f.title)+(x.f.ft?'<span class="tagx">'+esc(x.f.ft)+'</span>':'')+(i===0&&all.length>1?'<span class="tagx">最低</span>':'')+'</b><span class="num">'+money(x.f.amt,c)+'</span></div><div class="ovbar"><i style="width:'+Math.max(3,Math.round(x.per/mxv*100))+'%"></i></div><div class="sub">'+(x.legs===2?'來回 2 段，':'')+'每段約 '+money(x.per,c)+'</div></div>').join('')+'<div class="sub" style="margin-top:6px">依每段價格由低到高排列（來回算 2 段），含個人記帳與共同分帳中你的份。</div></section>';
+}
+function cmpCard(title,key,c,rows,perNight){
+  const list=rows.filter(r=>r.st&&r.st.base===c&&r.st[key]>0).sort((a,b)=>a.st[key]-b.st[key]);
+  if(!list.length)return '';
+  const mxv=list[list.length-1].st[key];
+  return '<section class="card"><h3>'+title+'比較（'+c+'）</h3>'+list.map((r,i)=>{
+    const s=r.st,v=s[key];
+    return '<div class="cmp"><div class="cmph"><b>'+esc(S.trips[r.id].name)+(i===0&&list.length>1?'<span class="tagx">最低</span>':'')+'</b><span class="num">'+money(v,c)+'</span></div>'+
+      '<div class="ovbar"><i style="width:'+Math.max(3,Math.round(v/mxv*100))+'%"></i></div>'+
+      (perNight?'<div class="sub">'+s.nights+' 晚，每晚約 '+money(v/s.nights,c)+'</div>':'')+'</div>';
+  }).join('')+'<div class="sub" style="margin-top:6px">由低到高排列，含個人記帳與共同分帳中你的份。</div></section>';
+}
+/* TWD per 1 unit of currency c: manual rate first, else derived from trip rates */
+function fxTWD(c,skipManual){
+  if(c==='TWD')return 1;
+  if(!skipManual){const m=Number((S.fx||{})[c]);if(m>0)return m;}
+  for(const id in S.trips){const t=S.trips[id],r=t.rates||{};
+    if(t.base==='TWD'&&Number(r[c])>0)return Number(r[c]);
+    if(t.base===c&&Number(r.TWD)>0)return 1/Number(r.TWD);}
+  return null;
+}
+function ovFactor(from,to){if(from===to)return 1;const a=fxTWD(from),b=fxTWD(to);return a&&b?a/b:null;}
+function ovConv(st,D){
+  if(!st)return null;
+  const f=ovFactor(st.base,D);
+  if(!(f>0))return null;
+  return Object.assign({},st,{base:D,from:st.base,f,mine:st.mine*f,group:st.group*f,lodging:st.lodging*f,flights:(st.flights||[]).map(x=>Object.assign({},x,{amt:x.amt*f}))});
+}
+function openOvCur(){
+  const D=CUR[S.ovCur]?S.ovCur:'TWD';
+  const bases=[...new Set(Object.keys(S.mine).filter(id=>S.trips[id]).map(id=>S.trips[id].base))];
+  const tmp={};
+  const opts=Object.keys(CUR).map(c=>'<option value="'+c+'"'+(c===D?' selected':'')+'>'+c+' '+esc(cname(c))+'</option>').join('');
+  openSheet('顯示幣別','<form class="stack" data-form="ovcur"><label class="f"><span>統計用這個幣別顯示</span><select name="cur" id="ovc-cur">'+opts+'</select></label><div id="ovc-rates"></div><div class="sub">匯率只存在你這支手機的瀏覽器，不會影響旅伴看到的畫面，也不會改動帳目。</div><div class="actions"><button class="btn primary">套用</button></div></form>',body=>{
+    const draw=()=>{
+      const sel=body.querySelector('#ovc-cur').value;
+      const cs=[...new Set(bases.concat([sel]))].filter(c=>c!=='TWD');
+      body.querySelector('#ovc-rates').innerHTML=cs.length?'<div class="lbl">匯率（1 外幣 = 多少 TWD）</div>'+cs.map(c=>{
+        const m=(S.fx||{})[c],a=fxTWD(c,true);
+        const v=tmp[c]!=null?tmp[c]:(m>0?m:(a?+a.toPrecision(5):''));
+        return '<label class="rate"><span style="flex:1;min-width:120px">1 '+c+' '+esc(cname(c))+'</span><span>=</span><input type="number" step="any" inputmode="decimal" min="0" data-fx="'+c+'" placeholder="輸入匯率" value="'+esc(v)+'"><span>TWD</span></label>';
+      }).join(''):'';
+    };
+    body.querySelector('#ovc-cur').addEventListener('change',draw);
+    body.addEventListener('input',ev=>{const i=ev.target.closest('[data-fx]');if(i)tmp[i.dataset.fx]=i.value;});
+    draw();
+  });
+}
+function ovView(){
+  const all=Object.keys(S.mine).filter(id=>S.trips[id]);
+  if(!all.length)return '<div class="empty">還沒有旅行。建立或加入旅行後，這裡會列出每趟的花費。</div>';
+  const key=id=>{const t=S.trips[id];const d=t.start?Date.parse(t.start):NaN;return isNaN(d)?(t.at||0):d;};
+  all.sort((a,b)=>key(b)-key(a));
+  const D=CUR[S.ovCur]?S.ovCur:'TWD';
+  const dOf=id=>(S.trips[id].dest||'').trim();
+  const regions=[...new Set(all.map(dOf).filter(Boolean))];
+  const hasNone=all.some(id=>!dOf(id));
+  if(S.ovTrip!=='all'&&S.ovTrip!=='__none'&&!regions.includes(S.ovTrip))S.ovTrip='all';
+  if(S.ovTrip==='__none'&&!hasNone)S.ovTrip='all';
+  const ids=S.ovTrip==='all'?all:all.filter(id=>S.ovTrip==='__none'?!dOf(id):dOf(id)===S.ovTrip);
+  const single=ids.length===1;
+  const rows=ids.map(id=>{const raw=ovStats(id);return {id,raw,st:ovConv(raw,D)};});
+  const ok=rows.filter(r=>r.st);
+  const noRate=rows.filter(r=>r.raw&&!r.st);
+  const mxv=Math.max(0,...ok.map(r=>r.st.mine));
+  const sum=ok.reduce((a,r)=>a+r.st.mine,0),grp=ok.reduce((a,r)=>a+r.st.group,0),dayz=ok.reduce((a,r)=>a+r.st.days,0);
+  const per=dayz?sum/dayz:0;
+  const estDays=S.estDays!=null?S.estDays:5;
+  const cnt=r=>all.filter(id=>dOf(id)===r).length;
+  const opts='<option value="all"'+(S.ovTrip==='all'?' selected':'')+'>全部地區（'+all.length+' 趟）</option>'+regions.map(r=>'<option value="'+esc(r)+'"'+(S.ovTrip===r?' selected':'')+'>'+esc(r)+'（'+cnt(r)+' 趟）</option>').join('')+(hasNone?'<option value="__none"'+(S.ovTrip==='__none'?' selected':'')+'>未填目的地（'+all.filter(id=>!dOf(id)).length+' 趟）</option>':'');
+  const cs=S.ovCats||[];
+  const catChips='<button class="chip'+(cs.length?'':' on')+'" data-act="ov-cat" data-cat="all">全部</button>'+CATS.map(c=>'<button class="chip'+(cs.includes(c)?' on':'')+'" data-act="ov-cat" data-cat="'+c+'">'+c+'</button>').join('');
+  const ctl='<div class="ovctl"><label class="f"><span>選擇地區</span><select data-ov-trip>'+opts+'</select></label><button class="btn" data-act="ov-cur">顯示幣別：'+D+' ⇄</button><div><div class="lbl">花費類別（可複選）</div><div class="chips">'+catChips+'</div></div></div>';
+  const warn=noRate.length?'<div class="note warn">'+noRate.map(r=>esc(S.trips[r.id].name)).join('、')+' 的記帳幣別是 '+[...new Set(noRate.map(r=>r.raw.base))].join('、')+'，還沒有換算成 '+D+' 的匯率，先不計入。<button class="link" data-act="ov-cur">設定匯率</button></div>':'';
+  const kv=single?'<div><small>我花了</small><b>'+money(sum,D)+'</b></div><div><small>平均每天</small><b>'+money(per,D)+'</b></div><div><small>全團共</small><b>'+money(grp,D)+'</b></div>':'<div><small>旅行次數</small><b>'+ok.length+' 趟</b></div><div><small>平均每趟</small><b>'+money(ok.length?sum/ok.length:0,D)+'</b></div><div><small>平均每天</small><b>'+money(per,D)+'</b></div>';
+  const sums=ok.length?'<section class="card"><h3>我的花費統計（'+D+(cs.length?'・'+cs.join('、'):'')+'）</h3><div class="kv">'+kv+'</div>'+
+    '<label class="est">下次想去 <input type="number" min="1" max="365" inputmode="numeric" data-est data-perday="'+per+'" data-cur="'+D+'" data-for="est-'+D+'" value="'+estDays+'"> 天，大約要準備 <b id="est-'+D+'">'+money(per*estDays,D)+'</b></label>'+
+    '<div class="sub" style="margin-top:8px">依過去每天平均花費估算，包含已記的機票、住宿、個人記帳與共同分帳中你的份。各趟金額都已換算成 '+D+'。</div></section>':'';
+  const cards=rows.map(r=>{
+    const t=S.trips[r.id],s=r.st;let body;
+    if(!r.raw)body='<div class="sub">計算中…</div>';
+    else if(!s)body='<div class="sub">缺少 '+r.raw.base+' → '+D+' 匯率，請按上方「顯示幣別」設定。</div>';
+    else{const pct=mxv?Math.max(3,Math.round(s.mine/mxv*100)):3;
+      body='<div class="ovbar"><i style="width:'+pct+'%"></i></div><div class="kv"><div><small>我花了</small><b>'+money(s.mine,D)+'</b></div><div><small>平均每天</small><b>'+money(s.mine/s.days,D)+'</b></div><div><small>全團共</small><b>'+money(s.group,D)+'</b></div></div>'+
+        (s.from!==D?'<div class="sub">原記帳幣別 '+s.from+'，以 1 '+s.from+' ≈ '+(+s.f.toPrecision(4))+' '+D+' 換算</div>':'')+
+        (s.missing?'<div class="sub" style="color:var(--warn)">有 '+s.missing+' 筆外幣缺匯率，尚未計入</div>':'');}
+    return '<button class="ovc" data-act="open-ov" data-id="'+r.id+'"><div class="ovh"><b>'+esc(t.name)+'</b><span class="sub">'+esc(tripMeta(t))+'</span></div>'+body+'</button>';
+  }).join('');
+  const cmps=ok.length?compareCard(D,ok):'';
+  return ctl+warn+(cs.length?'<div class="note warn">目前只計入「'+cs.map(esc).join('、')+'」的花費。下方機票・住宿比較不受這個篩選影響。</div>':'')+sums+cmps+'<h2 class="sec">各趟明細（點一下進入記帳）</h2><div class="ov">'+cards+'</div>';
+}
+function ovViewOld(){
+  const ids=Object.keys(S.mine).filter(id=>S.trips[id]);
+  if(!ids.length)return '<div class="empty">還沒有旅行。建立或加入旅行後，這裡會列出每趟的花費。</div>';
+  const key=id=>{const t=S.trips[id];const d=t.start?Date.parse(t.start):NaN;return isNaN(d)?(t.at||0):d;};
+  ids.sort((a,b)=>key(b)-key(a));
+  const rows=ids.map(id=>({id,st:ovStats(id)}));
+  const mx={},agg={};
+  rows.forEach(r=>{const s=r.st;if(!s)return;mx[s.base]=Math.max(mx[s.base]||0,s.mine);const a=agg[s.base]||(agg[s.base]={n:0,sum:0,days:0});a.n++;a.sum+=s.mine;a.days+=s.days;});
+  const days=S.estDays!=null?S.estDays:5;
+  const sums=Object.keys(agg).map(c=>{
+    const a=agg[c];const per=a.days?a.sum/a.days:0;
+    return '<section class="card"><h3>我的花費統計（'+c+'）</h3><div class="kv"><div><small>旅行次數</small><b>'+a.n+' 趟</b></div><div><small>平均每趟</small><b>'+money(a.sum/a.n,c)+'</b></div><div><small>平均每天</small><b>'+money(per,c)+'</b></div></div>'+
+      '<label class="est">下次想去 <input type="number" min="1" max="365" inputmode="numeric" data-est data-perday="'+per+'" data-cur="'+c+'" data-for="est-'+c+'" value="'+days+'"> 天，大約要準備 <b id="est-'+c+'">'+money(per*days,c)+'</b></label>'+
+      '<div class="sub" style="margin-top:8px">依過去每天平均花費估算，包含已記的機票、住宿、個人記帳與共同分帳中你的份。</div></section>';
+  }).join('');
+  const cards=rows.map(r=>{
+    const t=S.trips[r.id],s=r.st;let body;
+    if(!s)body='<div class="sub">計算中…</div>';
+    else{const pct=mx[s.base]?Math.max(3,Math.round(s.mine/mx[s.base]*100)):3;
+      body='<div class="ovbar"><i style="width:'+pct+'%"></i></div><div class="kv"><div><small>我花了</small><b>'+money(s.mine,s.base)+'</b></div><div><small>平均每天</small><b>'+money(s.mine/s.days,s.base)+'</b></div><div><small>全團共</small><b>'+money(s.group,s.base)+'</b></div></div>'+(s.missing?'<div class="sub" style="color:var(--warn)">有 '+s.missing+' 筆外幣缺匯率，尚未計入</div>':'');}
+    return '<button class="ovc" data-act="open-ov" data-id="'+r.id+'"><div class="ovh"><b>'+esc(t.name)+'</b><span class="sub">'+esc(tripMeta(t))+'</span></div>'+body+'</button>';
+  }).join('');
+  const cmps=Object.keys(agg).map(c=>flightCard(c,rows)+cmpCard('住宿','lodging',c,rows,true)).join('');
+  return sums+cmps+'<h2 class="sec">各趟明細（點一下進入記帳）</h2><div class="ov">'+cards+'</div>';
+}
+function homeTrips(){
+  const list=Object.keys(S.mine).filter(id=>S.trips[id]).sort((a,b)=>(S.mine[b].joinedAt||0)-(S.mine[a].joinedAt||0));
+  return banner()+
+  '<section class="hero"><h1>旅伴手帳</h1><p>一個房間就是一趟旅行：大家看同一份行程，各自檢查行李，記帳時自動算出誰該給誰多少錢。</p></section>'+homeSeg()+
+  '<div class="cta"><button class="btn primary" data-act="new-trip">新增旅行</button><button class="btn" data-act="join-code">輸入房間代碼</button></div>'+
+  (list.length?'<h2 class="sec">我的旅行</h2><div class="passes">'+list.map(passHtml).join('')+'</div>'
+   :'<div class="empty" style="margin-top:18px">還沒有旅行。新增一趟，或輸入朋友給你的房間代碼加入。</div>');
+}
+function passHtml(id){
+  const t=S.trips[id];
+  return '<div class="pass"><a class="pass-main" href="#t-'+id+'"><span class="lab">BOARDING PASS · 旅行票</span><span class="pass-name">'+esc(t.name)+'</span><span class="pass-sub">'+esc(tripMeta(t))+'</span>'+mineLine(id,t)+'</a>'+
+   '<div class="pass-stub"><span class="lab">房間代碼</span><span class="code">'+esc(t.code)+'</span><i class="bc"></i><button class="link" data-act="copy-trip" data-id="'+id+'">複製成新旅行</button></div></div>';
+}
+
+/* trip shell */
+function tripView(){
+  const t=trip();
+  if(!t)return banner()+'<div class="empty" style="margin-top:40px">找不到這趟旅行。<br><a href="#">回首頁</a></div>';
+  if(!S.mine[S.tid])return gateView(t);
+  const body=S.tab==='plan'?viewPlan(t):S.tab==='pack'?viewPack(t):S.tab==='spend'?viewSpend(t):viewMore(t);
+  const icons={
+    plan:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+    pack:'<svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 9l2 2 4-4M8 16h8"/></svg>',
+    spend:'<svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M16 15h2"/></svg>',
+    more:'<svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>'};
+  const tabs=[['plan','行程'],['pack','行李'],['spend','記帳'],['more','設定']];
+  return '<header class="top"><a class="back" href="#" aria-label="回首頁">‹</a><div class="ttl"><b>'+esc(t.name)+'</b><small>'+esc(tripMeta(t))+'</small></div>'+
+    '<button class="tag" data-act="copy-code" data-code="'+esc(t.code)+'" aria-label="複製房間代碼"><span>房間</span><b>'+esc(t.code)+'</b></button></header>'+
+    banner()+'<main class="page">'+body+'</main>'+
+    (S.tab==='plan'?'<button class="fab" data-act="add-plan">＋ 行程</button>':S.tab==='spend'?(S.spendView==='mine'?'<button class="fab" data-act="add-mine">＋ 我的花費</button>':(S.spendView==='pub'?'':'<button class="fab" data-act="add-spend">＋ 記一筆</button>')):'')+
+    '<nav class="tabbar"><div>'+tabs.map(([k,l])=>'<button class="'+(S.tab===k?'on':'')+'" data-act="tab" data-tab="'+k+'">'+icons[k]+'<span>'+l+'</span></button>').join('')+'</div></nav>';
+}
+function gateView(t){
+  return '<header class="top"><a class="back" href="#" aria-label="回首頁">‹</a><div class="ttl"><b>'+esc(t.name)+'</b><small>需要房間代碼才能加入</small></div></header>'+banner()+
+   '<form class="card stack" data-form="gate" style="margin-top:10px"><label class="f"><span>房間代碼</span><input type="text" name="code" autocomplete="off" autocapitalize="characters" maxlength="12" placeholder="例如 AB3K9X" required></label><button class="btn primary">加入這趟旅行</button></form>';
+}
+
+/* plan */
+function planCmp(a,b){return (a.ord!=null?a.ord:(a.at||0))-(b.ord!=null?b.ord:(b.at||0))||(a.at||0)-(b.at||0);}
+function dayItems(day){return S.td.plan.filter(p=>(p.day||1)===day).sort(planCmp);}
+function renumber(list){
+  const tid=S.tid;const jobs=[];
+  list.forEach((p,i)=>{if(p.ord!==i*10)jobs.push(()=>dbp('trips/'+tid+'/plan/'+p.id).update({ord:i*10}));});
+  if(!jobs.length)return;
+  return w(()=>q('plan:'+tid,async()=>{for(const j of jobs)await j();}));
+}
+function movePlan(id,dir){
+  const it=S.td.plan.find(x=>x.id===id);if(!it)return;
+  const list=dayItems(it.day||1);const i=list.findIndex(x=>x.id===id);const j=i+dir;
+  if(j<0||j>=list.length)return;
+  [list[i],list[j]]=[list[j],list[i]];renumber(list);
+}
+function sortDayByTime(){
+  const list=dayItems(S.day).slice().sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
+  renumber(list);toast('已依時間重排');
+}
+function viewPlan(t){
+  const n=Math.max(t.days||1,...S.td.plan.map(p=>p.day||1));
+  if(S.day>n)S.day=1;
+  let pills='';
+  for(let i=1;i<=n;i++)pills+='<button class="day'+(i===S.day?' on':'')+(isToday(t,i)?' today':'')+'" data-act="day" data-day="'+i+'"><b>Day '+i+'</b><small>'+esc(dayLabel(t,i)||'　')+'</small></button>';
+  pills+='<button class="day add" data-act="add-day">＋ 加一天</button>';
+  if(n>1){const k=S.td.plan.filter(p=>(p.day||1)===n).length;pills+='<button class="day add" data-act="rm-day">'+(armed('rm-day')?'確認刪除 Day '+n+(k?'（含 '+k+' 個行程）':'')+'？':'－ 減一天')+'</button>';}
+  const items=dayItems(S.day);
+  return '<div class="days" role="tablist">'+pills+'</div>'+
+   (items.length?'<div>'+(items.length>1?'<div style="text-align:right"><button class="link" data-act="sort-time">依時間重排</button></div>':'')+items.map((p,i)=>'<div class="item"><button class="itemmain" data-act="edit-plan" data-id="'+p.id+'"><span class="no">'+(i+1)+'</span><span class="t">'+esc(p.time||'—')+'</span><span class="tx"><b>'+esc(p.title)+'</b>'+(p.note?'<span class="n">'+esc(p.note)+'</span>':'')+'</span></button><div class="mv"><button class="x" data-act="mv-plan" data-dir="-1" data-id="'+p.id+'" aria-label="上移"'+(i===0?' disabled':'')+'>▲</button><button class="x" data-act="mv-plan" data-dir="1" data-id="'+p.id+'" aria-label="下移"'+(i===items.length-1?' disabled':'')+'>▼</button></div></div>').join('')+'</div>'
+    :'<div class="empty">Day '+S.day+' 還沒有安排。按右下角「＋ 行程」新增，旅伴都會看到。</div>');
+}
+function openPlan(id){
+  const t=trip();const n=Math.max(t.days||1,...S.td.plan.map(p=>p.day||1));
+  const e=id?S.td.plan.find(x=>x.id===id):null;
+  if(id&&!e)return;
+  let opts='';for(let i=1;i<=n;i++)opts+='<option value="'+i+'"'+((e?e.day:S.day)===i?' selected':'')+'>Day '+i+(dayLabel(t,i)?'（'+dayLabel(t,i)+'）':'')+'</option>';
+  openSheet(e?'編輯行程':'新增行程','<form class="stack" data-form="plan" data-id="'+(id||'')+'">'+
+   '<div class="two keep"><label class="f"><span>哪一天</span><select name="day">'+opts+'</select></label><label class="f"><span>時間（可不填）</span><input type="time" name="time" value="'+esc(e?e.time:'')+'"></label></div>'+
+   '<label class="f"><span>做什麼</span><input type="text" name="title" maxlength="60" required value="'+esc(e?e.title:'')+'" placeholder="例如：淺草寺、搭 JR 到京都"></label>'+
+   '<label class="f"><span>備註（地點、訂位、集合點）</span><textarea name="note" maxlength="300">'+esc(e?e.note:'')+'</textarea></label>'+
+   '<div class="actions">'+(e?'<button type="button" class="btn danger grow" data-sx="del">刪除</button>':'')+'<button class="btn primary">儲存</button></div></form>',
+   body=>{const b=body.querySelector('[data-sx="del"]');if(b)b.addEventListener('click',()=>{if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='再按一次刪除';return;}
+     closeSheet();w(()=>dbp('trips/'+S.tid+'/plan/'+id).delete());});});
+}
+
+/* packing */
+function packState(){
+  const shared=S.td.pack.slice().sort((a,b)=>(a.at||0)-(b.at||0));
+  const extra=P().extra||[];const checked=P().checked||{};
+  const total=shared.length+extra.length;
+  const done=shared.filter(x=>checked[x.id]).length+extra.filter(x=>x.done).length;
+  return {shared,extra,checked,total,done};
+}
+function packRow(kind,id,text,done){
+  const key='pack:'+kind+':'+id;const a=armed(key);
+  return '<div class="row"><label class="chk"><input type="checkbox" data-pack="'+kind+'" data-id="'+id+'"'+(done?' checked':'')+'><span class="box"></span><span class="txt'+(done?' done':'')+'">'+esc(text)+'</span></label>'+
+   '<button class="x'+(a?' armed':'')+'" data-act="del-pack" data-kind="'+kind+'" data-id="'+id+'" aria-label="刪除">'+(a?'刪除？':'✕')+'</button></div>';
+}
+function viewPack(t){
+  const s=packState();
+  const have=new Set((S.packScope==='all'?s.shared:s.extra).map(x=>x.text));
+  const sugg=SUGGEST.filter(x=>!have.has(x));
+  const pct=s.total?Math.round(s.done/s.total*100):0;
+  return '<section class="card"><h3>我的行李檢查</h3>'+
+    '<div style="display:flex;justify-content:space-between;align-items:baseline"><span class="big">'+s.done+'<span class="sub"> / '+s.total+'</span></span>'+
+    '<span class="'+(s.total&&s.done===s.total?'pos':'sub')+'">'+(s.total?(s.done===s.total?'全部帶齊了':'還差 '+(s.total-s.done)+' 項'):'還沒有項目')+'</span></div>'+
+    '<div class="prog" role="progressbar" aria-valuenow="'+pct+'" aria-valuemin="0" aria-valuemax="100"><i style="width:'+pct+'%"></i></div>'+
+    '<div class="sub">打勾只記在你自己的手機，旅伴看不到你的勾選。</div></section>'+
+   '<section class="card"><h3>大家都要帶</h3>'+(s.shared.length?s.shared.map(x=>packRow('all',x.id,x.text,!!s.checked[x.id])).join(''):'<div class="sub">還沒有共用項目。例如：帳篷、投影機、團體保險文件。</div>')+'</section>'+
+   '<section class="card"><h3>我自己的</h3>'+(s.extra.length?s.extra.map(x=>packRow('me',x.id,x.text,!!x.done)).join(''):'<div class="sub">還沒有個人項目。下面可以直接新增，或點常用項目。</div>')+'</section>'+
+   '<section class="card stack"><h3 style="margin:0">新增項目</h3>'+
+    '<div class="seg" role="group" aria-label="新增到哪裡"><button type="button" data-act="pack-scope" data-scope="me" class="'+(S.packScope==='me'?'on':'')+'">只有我</button><button type="button" data-act="pack-scope" data-scope="all" class="'+(S.packScope==='all'?'on':'')+'">大家都要帶</button></div>'+
+    '<form class="addrow" data-form="addpack"><input type="text" id="pk-input" name="text" maxlength="40" placeholder="要帶什麼？" autocomplete="off" required><button class="btn primary">加入</button></form>'+
+    (sugg.length?'<div><div class="lbl">常用項目（點一下加入「'+(S.packScope==='all'?'大家都要帶':'我自己的')+'」）</div><div class="chips">'+sugg.map(x=>'<button class="chip ghost" data-act="quick-pack" data-text="'+esc(x)+'">＋ '+esc(x)+'</button>').join('')+'</div></div>':'')+'</section>';
+}
+function addPack(text,scope){
+  text=text.trim();if(!text)return;
+  const tid=S.tid;
+  if(scope==='all')return w(()=>dbp('trips/'+tid+'/pack/'+rid(8)).set({text,at:Date.now()}));
+  const extra=(P().extra||[]).concat([{id:rid(6),text,done:false}]);
+  return w(()=>q('p:'+tid,()=>dbp('data/users/'+S.uid+'/'+tid).update({extra})));
+}
+
+/* spend */
+function splitLabel(e){
+  if(e.mode==='treat')return '請客';
+  if(e.mode==='custom')return '各自指定';
+  if(e.mode==='transfer')return '還給 '+pname((e.among||[])[0]);
+  const n=(e.among||[]).length;
+  if(n===1)return pname(e.among[0])+' 全額';
+  return n===S.td.people.length?'全員平分':'平分 '+n+' 人';
+}
+const PCATS=['機票','交通','住宿','餐飲','門票','購物','網卡／保險','其他'];
+function mineSum(list,t){const rates=t.rates||{};let sum=0,missing=0;const byCat={};
+  for(const e of list){const r=e.cur===t.base?1:Number(rates[e.cur]);
+    if(!(r>0)){missing++;continue;}
+    const v=Math.round(e.amount*r*100)/100;sum+=v;const k=e.cat||'其他';byCat[k]=(byCat[k]||0)+v;}
+  return {sum,missing,byCat};}
+function mineLine(id,t){const l=(S.mine[id]&&S.mine[id].mine)||[];if(!l.length)return '';return '<span class="pass-sub">我的記帳 '+money(mineSum(l,t).sum,t.base)+'</span>';}
+function spendSeg(){const v=S.spendView==='mine'?'mine':S.spendView==='pub'?'pub':'shared';const b=(k,l)=>'<button data-act="spend-view" data-v="'+k+'" class="'+(v===k?'on':'')+'">'+l+'</button>';return '<div class="seg" role="group" aria-label="記帳類型">'+b('shared','共同分帳')+b('mine','我的花費')+b('pub','旅伴公開')+'</div>';}
+function viewSpend(t){return spendSeg()+(S.spendView==='mine'?viewMine(t):S.spendView==='pub'?viewPub(t):viewShared(t));}
+function viewPub(t){
+  const bc=t.base,me=meId();
+  const list=S.td.pub.slice();
+  if(!list.length)return '<div class="empty">旅伴還沒有公開任何花費。在「我的花費」記帳時，勾選「讓旅伴也看得到這一筆」，機票、住宿的價格就能互相參考。</div>';
+  const conv=e=>{const r=e.cur===bc?1:Number(t.rates&&t.rates[e.cur]);return r>0?Math.round(e.amount*r*100)/100:null;};
+  const groups={};
+  list.forEach(e=>{const k=e.cat||'其他';(groups[k]=groups[k]||[]).push(e);});
+  const order=['機票','住宿'].filter(k=>groups[k]).concat(Object.keys(groups).filter(k=>k!=='機票'&&k!=='住宿').sort());
+  return '<div class="sub">這裡只有旅伴自己選擇公開的項目。要修改或取消公開，請到「我的花費」。</div>'+order.map(cat=>{
+    const items=groups[cat].map(e=>{const v=conv(e);const legs=cat==='機票'&&e.ft==='來回'?2:1;return {e,v,legs,per:v==null?null:v/legs};})
+      .sort((a,b)=>(a.per==null?Infinity:a.per)-(b.per==null?Infinity:b.per));
+    const mxv=Math.max(1,...items.map(x=>x.per==null?0:x.per));
+    return '<section class="card"><h3>'+esc(cat)+'（旅伴公開）</h3>'+items.map(x=>{
+      const e=x.e;
+      return '<div class="cmp"><div class="cmph"><b>'+esc(pname(e.owner))+(e.owner===me?'<span class="tagx">我</span>':'')+' · '+esc(e.title)+(e.ft?'<span class="tagx">'+esc(e.ft)+'</span>':'')+'</b><span class="num">'+money(e.amount,e.cur)+'</span></div>'+
+        (x.per==null?'<div class="sub">未設定匯率，尚未換算</div>':'<div class="ovbar"><i style="width:'+Math.max(3,Math.round(x.per/mxv*100))+'%"></i></div><div class="sub">'+(e.cur!==bc?'≈ '+money(x.v,bc)+'，':'')+(cat==='機票'?(x.legs===2?'來回 2 段，':'')+'每段約 '+money(x.per,bc):(e.date?esc(e.date):''))+'</div>')+'</div>';
+    }).join('')+'</section>';
+  }).join('');
+}
+function viewMine(t){
+  const bc=t.base,me=meId();
+  const L=computeLedger(t,people(),S.td.spend);
+  const share=me?(L.owed[me]||0)/100:0;
+  const list=(P().mine||[]).slice().sort((a,b)=>(b.at||0)-(a.at||0));
+  const M=mineSum(list,t);
+  const total=M.sum+share;
+  const bars=Object.keys(M.byCat).map(k=>[k,M.byCat[k]]);
+  if(share>0)bars.push(['共同分帳',share]);
+  bars.sort((a,b)=>b[1]-a[1]);
+  const mx=bars.length?bars[0][1]:1;
+  return '<section class="card"><h3>我這趟總共花了</h3><div class="big">'+money(total,bc)+'</div>'+
+   '<div class="sub">個人記帳 '+money(M.sum,bc)+' ＋ 共同分帳中我的份 '+money(share,bc)+'</div>'+
+   (M.missing?'<div class="note warn" style="margin-bottom:0">有 '+M.missing+' 筆外幣花費缺少匯率，尚未計入。到「設定」輸入匯率後會自動換算。</div>':'')+
+   '<div class="sub" style="margin-top:6px">個人記帳只有你自己看得到，旅伴看不到。</div></section>'+
+  (bars.length?'<section class="card"><h3>花在哪裡</h3>'+bars.map(b=>'<div class="bar"><span>'+esc(b[0])+'</span><i style="width:'+Math.max(3,Math.round(b[1]/mx*100))+'%"></i><span class="num">'+money(b[1],bc)+'</span></div>').join('')+'</section>':'')+
+  '<section><h2 class="sec" style="margin-top:6px">我的明細</h2>'+(list.length?list.map(e=>{
+    const r=e.cur===bc?1:Number(t.rates&&t.rates[e.cur]);
+    const conv=e.cur!==bc?(r>0?'≈ '+money(e.amount*r,bc):'未設定匯率'):'';
+    return '<button class="exp" data-act="edit-mine" data-id="'+e.id+'"><span class="grow"><b>'+esc(e.title)+'<span class="tagx">'+esc(e.cat||'其他')+'</span>'+(e.ft?'<span class="tagx">'+esc(e.ft)+'</span>':'')+(e.pub?'<span class="tagx">公開</span>':'')+'</b>'+(e.date?'<span class="sub">'+esc(e.date)+'</span>':'')+'</span><span class="r">'+money(e.amount,e.cur)+(conv?'<small>'+esc(conv)+'</small>':'')+'</span></button>';}).join('')
+   :'<div class="empty">還沒有個人花費。機票、車票、住宿這些自己出的錢，按右下角「＋ 我的花費」記下來。</div>')+'</section>';
+}
+function openMine(id){
+  const t=trip();const e=id?(P().mine||[]).find(x=>x.id===id):null;if(id&&!e)return;
+  const curs=[t.base].concat(t.currencies||[]);
+  openSheet(e?'編輯我的花費':'新增我的花費','<form class="stack" data-form="mine" data-id="'+(id||'')+'">'+
+   '<label class="f"><span>分類（花費總覽的住宿、機票比較會看這一欄）</span><select name="cat" required>'+(e?'':'<option value="">請先選分類</option>')+PCATS.map(c=>'<option'+((e&&(e.cat||'其他')===c)?' selected':'')+'>'+c+'</option>').join('')+'</select></label>'+
+   '<label class="f" id="m-ft"><span>機票類型</span><select name="ft">'+FT.map(c=>'<option'+((e&&e.ft===c)?' selected':'')+'>'+c+'</option>').join('')+'</select></label>'+
+   '<label class="f"><span>花在什麼</span><input type="text" name="title" maxlength="60" required value="'+esc(e?e.title:'')+'" placeholder="例如：來回機票"></label>'+
+   '<div class="two keep"><label class="f"><span>金額</span><input type="number" name="amount" inputmode="decimal" step="any" min="0" required value="'+(e?esc(e.amount):'')+'"></label><label class="f"><span>幣別</span><select name="cur">'+curs.map(c=>'<option value="'+c+'"'+((e?e.cur:t.base)===c?' selected':'')+'>'+c+' '+esc(cname(c))+'</option>').join('')+'</select></label></div>'+
+   
+   
+   '<label class="f"><span>日期（可不填）</span><input type="date" name="date" value="'+esc(e?(e.date||''):'')+'"></label>'+
+   '<div><label class="chk"><input type="checkbox" name="pub"'+(e&&e.pub?' checked':'')+'><span class="box"></span><span class="txt">讓旅伴也看得到這一筆</span></label><div class="sub">預設只有你自己看得到。公開後，旅伴能在「旅伴公開」看到名稱、金額和分類，隨時可以取消。</div></div>'+
+   '<div class="actions">'+(e?'<button type="button" class="btn danger grow" data-sx="del">刪除</button>':'')+'<button class="btn primary">儲存</button></div></form>',
+   body=>{
+     const form=body.querySelector('form');
+     const sync=()=>{body.querySelector('#m-ft').hidden=form.elements['cat'].value!=='機票';};
+     body.addEventListener('change',sync);sync();
+     const b=body.querySelector('[data-sx="del"]');
+     if(b)b.addEventListener('click',()=>{if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='再按一次刪除';return;}
+       closeSheet();const tid=S.tid;const mine=(P().mine||[]).filter(x=>x.id!==id);
+       w(async()=>{await q('p:'+tid,()=>dbp('data/users/'+S.uid+'/'+tid).update({mine}));if(e&&e.pub)await dbp('trips/'+tid+'/pub/'+id).delete();});});
+   });
+}
+function saveMine(form){
+  const fd=new FormData(form);const id=form.dataset.id;const tid=S.tid;
+  const title=String(fd.get('title')).trim();const amount=parseFloat(fd.get('amount'));
+  if(!title||!(amount>0)){toast('請填寫名稱與金額');return;}
+  const list=(P().mine||[]).slice();const old=id?list.find(x=>x.id===id):null;
+  const cat=String(fd.get('cat'));
+  const entry={id:id||rid(6),title,amount,cur:String(fd.get('cur')),cat,ft:cat==='機票'?String(fd.get('ft')||''):'',date:String(fd.get('date')||''),pub:!!fd.get('pub'),at:old&&old.at?old.at:Date.now()};
+  const mine=id?list.map(x=>x.id===id?entry:x):list.concat([entry]);
+  const owner=meId();
+  closeSheet();
+  w(async()=>{
+    await q('p:'+tid,()=>dbp('data/users/'+S.uid+'/'+tid).update({mine}));
+    const ref=dbp('trips/'+tid+'/pub/'+entry.id);
+    if(entry.pub&&owner)await ref.set({owner,title:entry.title,amount:entry.amount,cur:entry.cur,cat:entry.cat,ft:entry.ft,date:entry.date,at:entry.at});
+    else if(old&&old.pub)await ref.delete();
+  });
+}
+function openRename(id){
+  const p=S.td.people.find(x=>x.id===id);if(!p)return;
+  openSheet('修改旅伴名字','<form class="stack" data-form="rename" data-id="'+id+'"><label class="f"><span>名字</span><input type="text" name="name" maxlength="20" required value="'+esc(p.name)+'"></label><div class="sub">已經記好的帳目、結算的名字都會跟著更新。</div><div class="actions"><button class="btn primary">儲存</button></div></form>');
+  const i=$('#sheet input[name=name]');if(i)setTimeout(()=>{try{i.focus({preventScroll:true});i.select();}catch(e){}},60);
+}
+function tcatBar(t){
+  const tc=S.tcats||[];
+  const chips='<button class="chip'+(tc.length?'':' on')+'" data-act="t-cat" data-cat="all">全部</button>'+CATS.map(c=>'<button class="chip'+(tc.includes(c)?' on':'')+'" data-act="t-cat" data-cat="'+c+'">'+c+'</button>').join('');
+  let sub='';
+  if(tc.length){const L=computeLedger(t,people(),S.td.spend.filter(e=>tc.includes(e.cat||'其他')));sub='<div class="sub" style="margin-bottom:8px">只看「'+esc(tc.join('、'))+'」：合計 '+money(L.total/100,t.base)+'</div>';}
+  return '<div class="chips" style="margin-bottom:8px">'+chips+'</div>'+sub;
+}
+function settleTag(e){
+  if(e.mode==='transfer'||e.mode==='treat'||!e.settled)return '';
+  const cand=(e.mode==='custom'?Object.keys(e.custom||{}):(e.among||[])).filter(id=>id!==e.payer);
+  const done=cand.filter(id=>e.settled[id]).length;
+  if(!done)return '';
+  return '<span class="tagx">'+(done===cand.length?'已付清':'已收 '+done+'/'+cand.length)+'</span>';
+}
+function viewShared(t){
+  const L=computeLedger(t,people(),S.td.spend);
+  const bc=t.base;
+  const curParts=Object.keys(L.byCur).map(c=>money(L.byCur[c],c));
+  const rows=people();
+  const cats=Object.keys(L.byCat).sort((a,b)=>L.byCat[b]-L.byCat[a]);
+  const maxc=cats.length?L.byCat[cats[0]]:1;
+  const tc=S.tcats||[];
+  const list=S.td.spend.filter(e=>e.mode==='transfer'?!tc.length:(!tc.length||tc.includes(e.cat||'其他'))).sort((a,b)=>(b.at||0)-(a.at||0));
+  const miss=Object.keys(L.missingCur);
+  return '<section class="card"><h3>這趟總花費</h3><div class="big">'+money(L.total/100,bc)+'</div>'+
+    (curParts.length?'<div class="sub">原幣合計：'+curParts.map(esc).join('、')+'</div>':'<div class="sub">還沒有帳目</div>')+
+    (L.missing?'<div class="note warn" style="margin-bottom:0">有 '+L.missing+' 筆帳目缺少 '+esc(miss.join('、'))+' 的匯率，尚未計入。到「設定」輸入匯率後會自動換算。</div>':'')+'</section>'+
+  '<section class="card"><h3>誰要給誰</h3>'+
+    (L.transfers.length?L.transfers.map(x=>{
+      const amt=dec(bc)===0?Math.round(x.cents/100):Math.round(x.cents)/100;
+      const key='settle:'+x.from+':'+x.to;
+      return '<div class="xfer"><div class="who"><b>'+esc(pname(x.from))+'</b> → <b>'+esc(pname(x.to))+'</b></div><div class="amt">'+money(amt,bc)+'</div>'+
+        '<button class="btn small'+(armed(key)?' danger armed':'')+'" data-act="settle" data-from="'+x.from+'" data-to="'+x.to+'" data-amt="'+amt+'">'+(armed(key)?'確認已還？':'記錄已還')+'</button></div>';}).join('')
+     :'<div class="sub">'+(S.td.spend.length?'目前大家都結清了。':'記帳後，這裡會列出最少次數的轉帳方式。')+'</div>')+
+    (rows.length?'<div class="tblwrap" style="margin-top:12px"><table class="tbl"><thead><tr><th>旅伴</th><th>先付</th><th>應分攤</th><th>結餘</th></tr></thead><tbody>'+rows.map(p=>{
+      const n=L.net[p.id]||0;const cls=n>0?'pos':n<0?'neg':'';
+      return '<tr><td>'+esc(p.name)+(p.id===meId()?'<span class="tagx">我</span>':'')+'</td><td>'+money((L.paid[p.id]||0)/100,bc)+'</td><td>'+money((L.owed[p.id]||0)/100,bc)+'</td><td class="'+cls+'">'+(n>0?'+':'')+money(n/100,bc)+'</td></tr>';}).join('')+'</tbody></table></div><div class="sub" style="margin-top:6px">結餘為正代表可收回，為負代表要付出。</div>':'')+'</section>'+
+  (cats.length?'<section class="card"><h3>花在哪裡</h3>'+cats.map(c=>'<div class="bar"><span>'+esc(c)+'</span><i style="width:'+Math.max(3,Math.round(L.byCat[c]/maxc*100))+'%"></i><span class="num">'+money(L.byCat[c]/100,bc)+'</span></div>').join('')+'</section>':'')+
+  '<section><h2 class="sec" style="margin-top:6px">明細</h2>'+tcatBar(t)+(list.length?list.map(e=>{
+    const r=e.cur===bc?1:Number(t.rates&&t.rates[e.cur]);
+    const conv=e.cur!==bc?(r>0?'≈ '+money(e.amount*r,bc):'未設定匯率'):'';
+    return '<button class="exp" data-act="edit-spend" data-id="'+e.id+'"><span class="grow"><b>'+esc(e.title)+(e.mode==='transfer'?'<span class="tagx">還款</span>':'')+(e.cat&&e.mode!=='transfer'?'<span class="tagx">'+esc(e.cat)+'</span>':'')+(e.ft&&e.mode!=='transfer'?'<span class="tagx">'+esc(e.ft)+'</span>':'')+settleTag(e)+'</b><span class="sub">'+esc(pname(e.payer))+' 先付 · '+esc(splitLabel(e))+'</span></span><span class="r">'+money(e.amount,e.cur)+(conv?'<small>'+esc(conv)+'</small>':'')+'</span></button>';}).join('')
+   :'<div class="empty">還沒有帳目。誰先付了錢，就按「＋ 記一筆」。</div>')+'</section>';
+}
+function openExpense(id){
+  const t=trip();const ppl=people();
+  if(!ppl.length){toast('請先到「設定」新增旅伴');return;}
+  const e=id?S.td.spend.find(x=>x.id===id):null;
+  if(id&&!e)return;
+  if(e&&e.mode==='transfer'){
+    openSheet('還款記錄','<div class="stack"><div class="card"><b>'+esc(pname(e.payer))+' → '+esc(pname((e.among||[])[0]))+'</b><div class="big">'+money(e.amount,e.cur)+'</div><div class="sub">這筆只用來抵銷欠款，不計入總花費。</div></div><div class="actions"><button class="btn danger" data-sx="del">刪除這筆還款</button></div></div>',
+      body=>{const b=body.querySelector('[data-sx="del"]');b.addEventListener('click',()=>{if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='再按一次刪除';return;}closeSheet();w(()=>dbp('trips/'+S.tid+'/spend/'+id).delete());});});
+    return;
+  }
+  const st={mode:e?e.mode:'equal',among:new Set(e&&e.among?e.among:ppl.map(p=>p.id)),settled:new Set(e&&e.settled?Object.keys(e.settled).filter(k=>e.settled[k]):[]),cand:[]};
+  const curs=[t.base].concat(t.currencies||[]);
+  const payer=e?e.payer:(ppl.some(p=>p.id===meId())?meId():ppl[0].id);
+  const custom=(e&&e.custom)||{};
+  const html='<form class="stack" data-form="expense" data-id="'+(id||'')+'">'+
+   '<label class="f"><span>分類（花費總覽的住宿、機票比較會看這一欄）</span><select name="cat" required>'+(e?'':'<option value="">請先選分類</option>')+CATS.map(c=>'<option'+((e&&(e.cat||'其他')===c)?' selected':'')+'>'+c+'</option>').join('')+'</select></label>'+
+   '<label class="f" id="x-ft"><span>機票類型</span><select name="ft">'+FT.map(c=>'<option'+((e&&e.ft===c)?' selected':'')+'>'+c+'</option>').join('')+'</select></label>'+
+   '<label class="f"><span>這筆是什麼</span><input type="text" name="title" maxlength="60" required value="'+esc(e?e.title:'')+'" placeholder="例如：拉麵晚餐"></label>'+
+   '<div class="two keep"><label class="f"><span>金額</span><input type="number" name="amount" inputmode="decimal" step="any" min="0" required value="'+(e?esc(e.amount):'')+'"></label>'+
+   '<label class="f"><span>幣別</span><select name="cur">'+curs.map(c=>'<option value="'+c+'"'+((e?e.cur:t.base)===c?' selected':'')+'>'+c+' '+esc(cname(c))+'</option>').join('')+'</select></label></div>'+
+   '<label class="f"><span>誰先付的錢</span><select name="payer">'+ppl.map(p=>'<option value="'+p.id+'"'+(p.id===payer?' selected':'')+'>'+esc(p.name)+'</option>').join('')+'</select></label>'+
+   '<div><div class="lbl">怎麼分</div><div class="seg" id="x-mode"><button type="button" data-mode="equal">平分</button><button type="button" data-mode="custom">各自指定金額</button><button type="button" data-mode="treat">請客</button></div></div>'+
+   '<div id="x-equal"><div class="lbl">誰要分攤（只選一個人就是幫他全付）</div><div class="chips">'+ppl.map(p=>'<button type="button" class="chip" data-p="'+p.id+'">'+esc(p.name)+'</button>').join('')+'</div></div>'+
+   '<div id="x-custom"><div class="lbl">每個人這次花多少（可以不分給某些人）</div>'+ppl.map(p=>'<label class="crow"><span>'+esc(p.name)+'</span><input type="number" inputmode="decimal" step="any" min="0" data-c="'+p.id+'" value="'+(custom[p.id]?esc(custom[p.id]):'')+'"></label>').join('')+'<button type="button" class="link" data-sx="rest">把剩下的算給付款人</button></div>'+
+   '<div id="x-hint" class="hint"></div>'+
+   '<div id="x-settled"><div class="lbl">誰已經當場付給付款人了？（點一下標記）</div><div class="chips" id="x-settled-chips"></div><button type="button" class="link" data-sx="allpaid">全部標記已付</button><div class="sub">標記後，這一筆不會再出現在「誰要給誰」裡，但還是計入大家的花費。</div></div>'+
+   
+   
+   '<div class="actions">'+(e?'<button type="button" class="btn danger grow" data-sx="del">刪除</button>':'')+'<button class="btn primary">儲存</button></div></form>';
+  openSheet(e?'編輯帳目':'記一筆',html,body=>{
+    const form=body.querySelector('form');form._st=st;
+    const f=n=>form.elements[n];
+    function refresh(){
+      body.querySelectorAll('#x-mode button').forEach(b=>b.classList.toggle('on',b.dataset.mode===st.mode));
+      body.querySelectorAll('[data-p]').forEach(b=>b.classList.toggle('on',st.among.has(b.dataset.p)));
+      body.querySelector('#x-equal').hidden=st.mode!=='equal';
+      body.querySelector('#x-custom').hidden=st.mode!=='custom';
+      body.querySelector('#x-ft').hidden=f('cat').value!=='機票';
+      const payerId=f('payer').value;
+      let inSet=[];
+      if(st.mode==='equal')inSet=[...st.among];
+      else if(st.mode==='custom')inSet=[...body.querySelectorAll('[data-c]')].filter(i=>(parseFloat(i.value)||0)>0).map(i=>i.dataset.c);
+      const cand=ppl.filter(p=>p.id!==payerId&&inSet.includes(p.id)).map(p=>p.id);
+      st.cand=cand;
+      body.querySelector('#x-settled').hidden=!cand.length;
+      body.querySelector('#x-settled-chips').innerHTML=cand.map(id=>'<button type="button" class="chip'+(st.settled.has(id)?' on':'')+'" data-sp="'+id+'">'+(st.settled.has(id)?'✓ ':'')+esc(pname(id))+'</button>').join('');
+      const a=parseFloat(f('amount').value)||0,cur=f('cur').value;
+      const rate=cur===t.base?1:Number(t.rates&&t.rates[cur]);
+      const bs=rate>0&&cur!==t.base&&a>0?'（≈ '+money(a*rate,t.base)+'）':'';
+      const h=body.querySelector('#x-hint');h.className='hint';
+      if(cur!==t.base&&!(rate>0)){h.className='hint bad';h.textContent=cur+' 還沒有設定匯率，這筆會先存起來，但在設定匯率前不會計入統計。';}
+      else if(st.mode==='equal'){h.textContent=st.among.size&&a>0?'每人約 '+money(a/st.among.size,cur)+bs.replace('（','，總額 ').replace('）',''):(st.among.size?'':'請至少選一位分攤的人');}
+      else if(st.mode==='treat'){h.textContent='由付款人自己負擔，只計入總花費，不會產生欠款。';}
+      else{let sum=0;body.querySelectorAll('[data-c]').forEach(i=>{sum+=parseFloat(i.value)||0;});const diff=Math.round((a-sum)*100)/100;
+        if(Math.abs(diff)<0.005&&a>0){h.className='hint good';h.textContent='已分配完畢 '+money(sum,cur);}
+        else h.textContent='已分配 '+money(sum,cur)+' ／ 總額 '+money(a,cur)+(diff>0?'，還差 '+money(diff,cur):'，多了 '+money(-diff,cur));}
+    }
+    body.addEventListener('input',refresh);
+    body.addEventListener('change',refresh);
+    body.addEventListener('click',ev=>{
+      const m=ev.target.closest('[data-mode]');if(m){st.mode=m.dataset.mode;refresh();return;}
+      const sp=ev.target.closest('[data-sp]');if(sp){const id=sp.dataset.sp;if(st.settled.has(id))st.settled.delete(id);else st.settled.add(id);refresh();return;}
+      const ap=ev.target.closest('[data-sx="allpaid"]');if(ap){const c=st.cand||[];const all=c.every(id=>st.settled.has(id));c.forEach(id=>{if(all)st.settled.delete(id);else st.settled.add(id);});refresh();return;}
+      const p=ev.target.closest('[data-p]');if(p){const id=p.dataset.p;if(st.among.has(id))st.among.delete(id);else st.among.add(id);refresh();return;}
+      const r=ev.target.closest('[data-sx="rest"]');if(r){
+        const a=parseFloat(f('amount').value)||0;let sum=0;
+        body.querySelectorAll('[data-c]').forEach(i=>{if(i.dataset.c!==f('payer').value)sum+=parseFloat(i.value)||0;});
+        const rest=Math.round((a-sum)*100)/100;const inp=body.querySelector('[data-c="'+f('payer').value+'"]');
+        if(inp&&rest>=0){inp.value=rest;}refresh();return;}
+      const d=ev.target.closest('[data-sx="del"]');if(d){
+        if(!d.classList.contains('armed')){d.classList.add('armed');d.textContent='再按一次刪除';return;}
+        closeSheet();w(()=>dbp('trips/'+S.tid+'/spend/'+id).delete());}
+    });
+    refresh();
+  });
+}
+async function saveExpense(form){
+  const t=trip(),st=form._st,id=form.dataset.id;
+  const fd=new FormData(form);
+  const title=String(fd.get('title')).trim();
+  const amount=parseFloat(fd.get('amount'));
+  const cur=String(fd.get('cur'));
+  if(!title||!(amount>0)){toast('請填寫名稱與金額');return;}
+  const data={title,amount,cur,payer:String(fd.get('payer')),mode:st.mode,cat:String(fd.get('cat')),among:[],custom:{},at:Date.now()};
+  const old=id?S.td.spend.find(x=>x.id===id):null;if(old&&old.at)data.at=old.at;
+  data.ft=data.cat==='機票'?String(fd.get('ft')||''):'';
+  if(st.mode==='equal'){
+    data.among=[...st.among];
+    if(!data.among.length){toast('請至少選一位分攤的人');return;}
+  }else if(st.mode==='custom'){
+    let sum=0;form.querySelectorAll('[data-c]').forEach(i=>{const v=parseFloat(i.value)||0;if(v>0){data.custom[i.dataset.c]=v;sum+=v;}});
+    if(Math.abs(sum-amount)>0.005){toast('各人金額加起來要等於總額（目前相差 '+money(Math.round((amount-sum)*100)/100,cur)+'）');return;}
+  }
+  data.settled={};
+  if(st.mode!=='treat'){const cand=st.mode==='equal'?data.among:Object.keys(data.custom);cand.forEach(pid=>{if(pid!==data.payer&&st.settled.has(pid))data.settled[pid]=true;});}
+  closeSheet();
+  await w(()=>dbp('trips/'+S.tid+'/spend/'+(id||rid(8))).set(data));
+}
+
+/* more / settings */
+function viewMore(t){
+  const ppl=people();const rates=t.rates||{};
+  const avail=Object.keys(CUR).filter(c=>c!==t.base&&!(t.currencies||[]).includes(c));
+  return '<section class="card"><h3>房間代碼</h3><div class="ticket"><span class="lab" style="color:inherit">把這組代碼給旅伴</span><span class="code">'+esc(t.code)+'</span><button class="btn small" data-act="copy-code" data-code="'+esc(t.code)+'">複製代碼</button></div>'+
+    '<div class="sub" style="margin-top:8px">旅伴先用你分享的連結開啟本頁，再按「輸入房間代碼」加入。</div></section>'+
+  '<section class="card"><h3>旅伴</h3>'+ppl.map(p=>{
+    const key='person:'+p.id;
+    return '<div class="row"><span class="grow">'+esc(p.name)+(p.id===meId()?'<span class="tagx">我</span>':'')+'</span>'+
+     '<button class="link" data-act="rename-person" data-id="'+p.id+'">改名</button>'+(p.id!==meId()?'<button class="link" data-act="set-me" data-id="'+p.id+'">這是我</button>':'')+
+     '<button class="x'+(armed(key)?' armed':'')+'" data-act="del-person" data-id="'+p.id+'" aria-label="移除">'+(armed(key)?'移除？':'✕')+'</button></div>';}).join('')+
+   '<form class="addrow" data-form="addperson" style="margin-top:10px"><input type="text" name="name" maxlength="20" placeholder="新增旅伴（小孩或沒帶手機的人也可以）" required><button class="btn primary">新增</button></form></section>'+
+  '<section class="card"><h3>匯率（1 外幣 = 多少 '+esc(t.base)+'）</h3>'+
+    ((t.currencies||[]).length?(t.currencies||[]).map(c=>'<div class="rate"><span style="flex:1;min-width:120px">1 '+c+' '+esc(cname(c))+'</span><span>=</span><input type="number" data-rate="'+c+'" inputmode="decimal" step="any" min="0" placeholder="輸入匯率" value="'+(rates[c]!=null?esc(rates[c]):'')+'"><span>'+esc(t.base)+'</span><button class="x" data-act="del-cur" data-cur="'+c+'" aria-label="移除幣別">✕</button></div>').join(''):'<div class="sub">這趟只用 '+esc(t.base)+'，不需要匯率。</div>')+
+    (avail.length?'<form class="addrow" data-form="addcur" style="margin-top:10px"><select name="cur">'+avail.map(c=>'<option value="'+c+'">'+c+' '+esc(cname(c))+'</option>').join('')+'</select><button class="btn">加入幣別</button></form>':'')+
+    '<div class="sub" style="margin-top:8px">外幣帳目會用這裡的匯率自動換算成 '+esc(t.base)+'。匯率請自行輸入一次（頁面無法自動連到匯率網站），改匯率時整趟旅行的帳目都會重新換算。</div></section>'+
+  '<section class="card stack"><h3 style="margin:0">這趟旅行</h3><div class="actions" style="justify-content:flex-start"><button class="btn" data-act="edit-trip">編輯名稱與日期</button><button class="btn" data-act="copy-trip-here">複製成新旅行</button>'+
+    '<button class="btn danger'+(armed('leave')?' armed':'')+'" data-act="leave">'+(armed('leave')?'確認離開？':'離開這趟旅行')+'</button></div>'+
+    '<div class="sub">離開只會從你的清單移除，其他人的資料不受影響，之後仍可用代碼重新加入。</div></section>';
+}
+function openTripForm(){
+  const t=trip();const minDays=Math.max(1,...S.td.plan.map(p=>p.day||1));
+  openSheet('編輯旅行','<form class="stack" data-form="trip"><label class="f"><span>旅行名稱</span><input type="text" name="name" maxlength="40" required value="'+esc(t.name)+'"></label>'+
+   destField(t.dest,'目的地')+
+   '<div class="two keep"><label class="f"><span>出發日期</span><input type="date" name="start" value="'+esc(t.start||'')+'"></label><label class="f"><span>天數</span><input type="number" name="days" min="'+minDays+'" max="60" value="'+(t.days||1)+'" required></label></div>'+
+   '<div class="actions"><button class="btn primary">儲存</button></div></form>');
+}
+
+/* sheets */
+function openSheet(title,html,mount){
+  const sh=$('#sheet');
+  const body=document.createElement('div');
+  body.innerHTML='<div class="sh-head"><h2>'+esc(title)+'</h2><button class="icon" data-act="close-sheet" aria-label="關閉">✕</button></div>'+html;
+  sh.replaceChildren(body);
+  $('#layer').hidden=false;document.body.classList.add('lock');sh.scrollTop=0;
+  if(mount)mount(body);
+  const first=body.querySelector('input[type=text],input[type=number]');if(first&&!first.value)setTimeout(()=>{try{first.focus({preventScroll:true});}catch(e){}},60);
+}
+function closeSheet(){$('#layer').hidden=true;$('#sheet').replaceChildren();document.body.classList.remove('lock');}
+
+function openNewTrip(){
+  const st={cur:new Set(),rates:{}};
+  const baseOpts=Object.keys(CUR).map(c=>'<option value="'+c+'"'+(c==='TWD'?' selected':'')+'>'+c+' '+esc(cname(c))+'</option>').join('');
+  openSheet('新增旅行','<form class="stack" data-form="newtrip">'+
+   '<label class="f"><span>旅行名稱</span><input type="text" name="name" maxlength="40" required placeholder="例如：東京五天四夜"></label>'+
+   destField('','目的地（可不填）')+
+   '<div class="two keep"><label class="f"><span>出發日期（可不填）</span><input type="date" name="start"></label><label class="f"><span>天數</span><input type="number" name="days" min="1" max="60" value="3" required></label></div>'+
+   '<label class="f"><span>你在這趟旅行的名字</span><input type="text" name="me" maxlength="20" required value="'+esc(ls('tb-name'))+'"></label>'+
+   '<label class="f"><span>記帳的基準幣別</span><select name="base" id="nt-base">'+baseOpts+'</select></label>'+
+   '<div><div class="lbl">會用到的外幣（可複選，也可以之後再加）</div><div class="chips" id="nt-chips"></div></div>'+
+   '<div id="nt-rates"></div>'+
+   '<div class="actions"><button class="btn primary">建立旅行</button></div></form>',
+  body=>{
+    const form=body.querySelector('form');form._st=st;
+    const baseSel=body.querySelector('#nt-base');
+    function draw(){
+      const base=baseSel.value;st.cur.delete(base);
+      body.querySelector('#nt-chips').innerHTML=Object.keys(CUR).filter(c=>c!==base).map(c=>'<button type="button" class="chip'+(st.cur.has(c)?' on':'')+'" data-cur="'+c+'">'+c+' '+esc(cname(c))+'</button>').join('');
+      body.querySelector('#nt-rates').innerHTML=[...st.cur].map(c=>'<label class="rate"><span style="flex:1;min-width:120px">1 '+c+' =</span><input type="number" step="any" inputmode="decimal" min="0" data-nr="'+c+'" placeholder="輸入匯率" value="'+(st.rates[c]||'')+'"><span>'+base+'</span></label>').join('');
+    }
+    baseSel.addEventListener('change',draw);
+    body.addEventListener('click',ev=>{const b=ev.target.closest('[data-cur]');if(!b)return;const c=b.dataset.cur;if(st.cur.has(c))st.cur.delete(c);else st.cur.add(c);draw();});
+    body.addEventListener('input',ev=>{const i=ev.target.closest('[data-nr]');if(i)st.rates[i.dataset.nr]=i.value;});
+    draw();
+  });
+}
+function openJoin(){
+  openSheet('輸入房間代碼','<form class="stack" data-form="joincode"><label class="f"><span>朋友給你的 6 碼代碼</span><input type="text" name="code" autocomplete="off" autocapitalize="characters" maxlength="12" required placeholder="例如 AB3K9X"></label><div class="actions"><button class="btn primary">加入</button></div></form>');
+}
+async function startJoin(tid){
+  const snap=await w(()=>S.db.collection('trips/'+tid+'/people').get());
+  const ppl=snap?snap.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>(a.at||0)-(b.at||0)):[];
+  const t=S.trips[tid];
+  openSheet('你是哪一位？','<form class="stack" data-form="identity" data-tid="'+tid+'"><div class="sub">「'+esc(t.name)+'」的旅伴。選你自己，或新增一個名字。</div>'+
+    (ppl.length?'<div class="chips" id="id-chips">'+ppl.map(p=>'<button type="button" class="chip" data-pid="'+p.id+'">'+esc(p.name)+'</button>').join('')+'</div>':'')+
+    '<label class="f"><span>'+(ppl.length?'我是新旅伴，名字是':'你的名字')+'</span><input type="text" name="name" maxlength="20" value="" placeholder="輸入名字"></label>'+
+    '<div class="actions"><button class="btn primary">加入</button></div></form>',
+  body=>{
+    const form=body.querySelector('form');form._pid=null;
+    body.addEventListener('click',ev=>{const c=ev.target.closest('[data-pid]');if(!c)return;form._pid=form._pid===c.dataset.pid?null:c.dataset.pid;
+      body.querySelectorAll('[data-pid]').forEach(x=>x.classList.toggle('on',x.dataset.pid===form._pid));});
+  });
+}
+function openCopy(srcId){
+  const t=S.trips[srcId];if(!t)return;
+  openSheet('複製成新旅行','<form class="stack" data-form="copy" data-src="'+srcId+'">'+
+   '<label class="f"><span>新旅行名稱</span><input type="text" name="name" maxlength="40" required value="'+esc(t.name+'（複製）')+'"></label>'+
+   '<label class="f"><span>新的出發日期（可不填）</span><input type="date" name="start"></label>'+
+   '<div class="lbl">要一起複製的內容</div>'+
+   '<label class="chk"><input type="checkbox" name="withPlan" checked><span class="box"></span><span class="txt">行程</span></label>'+
+   '<label class="chk"><input type="checkbox" name="withPack" checked><span class="box"></span><span class="txt">大家都要帶的行李，以及我自己的清單（勾選會清空）</span></label>'+
+   '<label class="chk"><input type="checkbox" name="withPeople" checked><span class="box"></span><span class="txt">旅伴名單</span></label>'+
+   '<label class="chk"><input type="checkbox" name="withRates" checked><span class="box"></span><span class="txt">匯率</span></label>'+
+   '<div class="sub">帳目不會複製，新旅行會有新的房間代碼。</div>'+
+   '<div class="actions"><button class="btn primary">建立新旅行</button></div></form>');
+}
+
+/* ---------- writes ---------- */
+async function readCol(path){const s=await S.db.collection(path).get();return s.docs.map(d=>Object.assign({id:d.id},d.data()));}
+async function pool(jobs,n){let i=0;async function run(){while(i<jobs.length){const j=jobs[i++];await j();}}await Promise.all(Array.from({length:Math.min(n,jobs.length)},run));}
+async function createTrip(v){
+  const tid=rid(10),code=newCode(),pid=rid(8);
+  await S.db.doc('trips/'+tid).set({name:v.name,dest:v.dest,start:v.start,days:v.days,base:v.base,currencies:v.currencies,rates:v.rates,code,at:Date.now()});
+  await S.db.doc('trips/'+tid+'/people/'+pid).set({name:v.me,at:Date.now()});
+  await S.db.doc('data/users/'+S.uid+'/'+tid).set({me:pid,joinedAt:Date.now(),checked:{},extra:[]});
+  return tid;
+}
+async function copyTrip(srcId,o){
+  const src=S.trips[srcId];
+  const [ppl,plan,pack]=await Promise.all([readCol('trips/'+srcId+'/people'),o.withPlan?readCol('trips/'+srcId+'/plan'):[],o.withPack?readCol('trips/'+srcId+'/pack'):[]]);
+  const myOld=(S.mine[srcId]||{}).me;
+  const tid=rid(10),code=newCode();
+  await S.db.doc('trips/'+tid).set({name:o.name,dest:src.dest||'',start:o.start||'',days:src.days||1,base:src.base,currencies:(src.currencies||[]).slice(),rates:o.withRates?Object.assign({},src.rates||{}):{},code,at:Date.now(),from:srcId});
+  const pmap={};const jobs=[];
+  const keep=o.withPeople?ppl:ppl.filter(p=>p.id===myOld);
+  keep.forEach(p=>{const nid=rid(8);pmap[p.id]=nid;jobs.push(()=>S.db.doc('trips/'+tid+'/people/'+nid).set({name:p.name,at:p.at||Date.now()}));});
+  let me=pmap[myOld];
+  if(!me){me=rid(8);jobs.push(()=>S.db.doc('trips/'+tid+'/people/'+me).set({name:'我',at:Date.now()}));}
+  plan.forEach(i=>jobs.push(()=>S.db.doc('trips/'+tid+'/plan/'+rid(8)).set({day:i.day||1,time:i.time||'',title:i.title,note:i.note||'',at:i.at||Date.now(),ord:i.ord!=null?i.ord:(i.at||0)})));
+  pack.forEach(i=>jobs.push(()=>S.db.doc('trips/'+tid+'/pack/'+rid(8)).set({text:i.text,at:i.at||Date.now()})));
+  await pool(jobs,4);
+  const mineOld=S.mine[srcId]||{};
+  const extra=o.withPack?(mineOld.extra||[]).map(x=>({id:rid(6),text:x.text,done:false})):[];
+  await S.db.doc('data/users/'+S.uid+'/'+tid).set({me,joinedAt:Date.now(),checked:{},extra});
+  return tid;
+}
+function go(tid){S.tab='plan';location.hash='#t-'+tid;}
+
+/* ---------- events ---------- */
+document.addEventListener('click',ev=>{
+  const el=ev.target.closest('[data-act]');if(!el)return;
+  const a=el.dataset.act,d=el.dataset;
+  switch(a){
+    case 'close-sheet':closeSheet();break;
+    case 'ov-cat':case 't-cat':{
+      const key=a==='ov-cat'?'ovCats':'tcats';const c=d.cat;
+      if(c==='all')S[key]=[];else{const a=new Set(S[key]||[]);if(a.has(c))a.delete(c);else a.add(c);S[key]=[...a];}
+      render(true);break;}
+    case 'cmp-view':S.cmpView=d.v;render(true);break;
+    case 'ov-cur':openOvCur();break;
+    case 'home-tab':S.homeTab=d.v;if(d.v==='ov')ensureOv();render(true);break;
+    case 'open-ov':S.nextTab='spend';S.spendView='mine';location.hash='#t-'+d.id;break;
+    case 'new-trip':openNewTrip();break;
+    case 'join-code':openJoin();break;
+    case 'copy-trip':openCopy(d.id);break;
+    case 'copy-trip-here':openCopy(S.tid);break;
+    case 'copy-code':{
+      const code=d.code;
+      const fail=()=>toast('房間代碼：'+code+'（請手動複製）');
+      try{navigator.clipboard.writeText(code).then(()=>toast('已複製房間代碼 '+code),fail);}catch(e){fail();}
+      break;}
+    case 'tab':S.tab=d.tab;S.armed=null;render(true);window.scrollTo(0,0);break;
+    case 'day':S.day=+d.day;render(true);break;
+    case 'rm-day':{
+      const t=trip();const n=Math.max(t.days||1,...S.td.plan.map(p=>p.day||1));
+      if(n<=1)break;
+      arm('rm-day',()=>{const tid=S.tid;const gone=S.td.plan.filter(p=>(p.day||1)===n);if(S.day>=n)S.day=n-1;
+        w(async()=>{for(const p of gone)await dbp('trips/'+tid+'/plan/'+p.id).delete();await q('t:'+tid,()=>dbp('trips/'+tid).update({days:n-1}));});});
+      break;}
+    case 'add-day':{const t=trip();const n=Math.max(t.days||1,...S.td.plan.map(p=>p.day||1))+1;S.day=n;w(()=>q('t:'+S.tid,()=>dbp('trips/'+S.tid).update({days:n})));break;}
+    case 'mv-plan':movePlan(d.id,+d.dir);break;
+    case 'sort-time':sortDayByTime();break;
+    case 'add-plan':openPlan();break;
+    case 'edit-plan':openPlan(d.id);break;
+    case 'pack-scope':S.packScope=d.scope;render(true);break;
+    case 'quick-pack':addPack(d.text,S.packScope);break;
+    case 'del-pack':{
+      const kind=d.kind,id=d.id;
+      arm('pack:'+kind+':'+id,()=>{
+        if(kind==='all')w(()=>dbp('trips/'+S.tid+'/pack/'+id).delete());
+        else{const extra=(P().extra||[]).filter(x=>x.id!==id);const tid=S.tid;w(()=>q('p:'+tid,()=>dbp('data/users/'+S.uid+'/'+tid).update({extra})));}
+      });break;}
+    case 'spend-view':S.spendView=d.v;S.armed=null;render(true);break;
+    case 'add-mine':openMine();break;
+    case 'edit-mine':openMine(d.id);break;
+    case 'add-spend':openExpense();break;
+    case 'edit-spend':openExpense(d.id);break;
+    case 'settle':{
+      const key='settle:'+d.from+':'+d.to;const t=trip();
+      arm(key,()=>w(()=>dbp('trips/'+S.tid+'/spend/'+rid(8)).set({title:'還款',amount:+d.amt,cur:t.base,payer:d.from,mode:'transfer',among:[d.to],custom:{},cat:'',at:Date.now()})));
+      break;}
+    case 'rename-person':openRename(d.id);break;
+    case 'set-me':{const tid=S.tid;w(()=>q('p:'+tid,()=>dbp('data/users/'+S.uid+'/'+tid).update({me:d.id})));break;}
+    case 'del-person':{
+      const id=d.id;
+      const used=S.td.spend.some(e=>e.payer===id||(e.among||[]).includes(id)||(e.custom&&e.custom[id]!=null));
+      if(used){toast('這位旅伴已有帳目，不能移除。');break;}
+      if(S.td.people.length<=1){toast('至少要留一位旅伴。');break;}
+      arm('person:'+id,()=>w(()=>dbp('trips/'+S.tid+'/people/'+id).delete()));break;}
+    case 'del-cur':{
+      const c=d.cur;
+      if(S.td.spend.some(e=>e.cur===c)){toast(c+' 已有帳目，不能移除。');break;}
+      const t=trip();const next=(t.currencies||[]).filter(x=>x!==c);
+      w(()=>q('t:'+S.tid,()=>dbp('trips/'+S.tid).update({currencies:next})));break;}
+    case 'edit-trip':openTripForm();break;
+    case 'leave':{
+      const tid=S.tid;
+      arm('leave',async()=>{await w(()=>dbp('data/users/'+S.uid+'/'+tid).delete());location.hash='';});break;}
+  }
+});
+document.addEventListener('change',ev=>{
+  const ot=ev.target.closest('[data-ov-trip]');
+  if(ot){S.ovTrip=ot.value;render(true);return;}
+  const ci=ev.target.closest('[data-cmp-item]');if(ci){S.cmpItem=ci.value;render(true);return;}
+  const cb=ev.target.closest('[data-cmp-basis]');if(cb){S.cmpBasis=cb.value;render(true);return;}
+  const ds=ev.target.closest('[data-dest-sel]');
+  if(ds){
+    const inp=ds.closest('form').querySelector('input[name=dest]');const v=ds.value;
+    if(v==='__other'){if(DESTS.includes(inp.value))inp.value='';inp.hidden=false;try{inp.focus();}catch(e){}}
+    else{inp.value=v;inp.hidden=true;}
+    return;
+  }
+  const c=ev.target.closest('[data-pack]');
+  if(c){
+    const kind=c.dataset.pack,id=c.dataset.id,on=c.checked,tid=S.tid;
+    if(kind==='all')w(()=>q('p:'+tid,()=>dbp('data/users/'+S.uid+'/'+tid).update({checked:{[id]:on}})));
+    else{const extra=(P().extra||[]).map(x=>x.id===id?Object.assign({},x,{done:on}):x);w(()=>q('p:'+tid,()=>dbp('data/users/'+S.uid+'/'+tid).update({extra})));}
+    return;
+  }
+  const r=ev.target.closest('[data-rate]');
+  if(r){
+    const cur=r.dataset.rate,v=parseFloat(r.value);
+    if(!(v>0)){toast('匯率要大於 0');return;}
+    w(()=>q('t:'+S.tid,()=>dbp('trips/'+S.tid).update({rates:{[cur]:v}})));
+  }
+});
+document.addEventListener('submit',async ev=>{
+  const form=ev.target.closest('form[data-form]');if(!form)return;
+  ev.preventDefault();
+  const kind=form.dataset.form;const fd=new FormData(form);
+  const g=n=>String(fd.get(n)==null?'':fd.get(n)).trim();
+  if(kind==='newtrip'){
+    const st=form._st;const base=g('base');
+    const currencies=[...st.cur].filter(c=>c!==base);
+    const rates={};currencies.forEach(c=>{const r=parseFloat(st.rates[c]);if(r>0)rates[c]=r;});
+    const v={name:g('name'),dest:g('dest'),start:g('start'),days:Math.max(1,Math.min(60,parseInt(g('days'))||1)),me:g('me'),base,currencies,rates};
+    if(!v.name||!v.me)return;
+    ls('tb-name',v.me);closeSheet();
+    const tid=await w(()=>createTrip(v));if(tid)go(tid);
+  }else if(kind==='joincode'||kind==='gate'){
+    const code=g('code').toUpperCase().replace(/[^A-Z0-9]/g,'');
+    const id=Object.keys(S.trips).find(k=>S.trips[k].code===code);
+    if(!id||(kind==='gate'&&id!==S.tid)){toast('找不到這組房間代碼，請再確認一次。');return;}
+    if(S.mine[id]){closeSheet();go(id);return;}
+    closeSheet();startJoin(id);
+  }else if(kind==='identity'){
+    const tid=form.dataset.tid;const name=g('name');let pid=form._pid;
+    if(!pid&&!name){toast('請選擇你是誰，或輸入名字');return;}
+    closeSheet();
+    const ok=await w(async()=>{
+      if(!pid){pid=rid(8);await S.db.doc('trips/'+tid+'/people/'+pid).set({name,at:Date.now()});ls('tb-name',name);}
+      await S.db.doc('data/users/'+S.uid+'/'+tid).set({me:pid,joinedAt:Date.now(),checked:{},extra:[]});return true;});
+    if(ok)go(tid);
+  }else if(kind==='plan'){
+    const id=form.dataset.id;const title=g('title');if(!title)return;
+    const old=id?S.td.plan.find(x=>x.id===id):null;
+    closeSheet();
+    w(()=>dbp('trips/'+S.tid+'/plan/'+(id||rid(8))).set({day:parseInt(g('day'))||1,time:g('time'),title,note:g('note'),at:old&&old.at?old.at:Date.now(),...(old&&old.ord!=null?{ord:old.ord}:{})}));
+    S.day=parseInt(g('day'))||1;
+  }else if(kind==='rename'){
+    const id=form.dataset.id,name=g('name');if(!name)return;
+    closeSheet();
+    w(()=>q('n:'+id,()=>dbp('trips/'+S.tid+'/people/'+id).update({name})));
+  }else if(kind==='mine'){
+    saveMine(form);
+  }else if(kind==='expense'){
+    saveExpense(form);
+  }else if(kind==='addpack'){
+    const text=g('text');if(!text)return;
+    await addPack(text,S.packScope);
+    render(true);const i=$('#pk-input');if(i)i.focus();
+  }else if(kind==='addperson'){
+    const name=g('name');if(!name)return;
+    await w(()=>dbp('trips/'+S.tid+'/people/'+rid(8)).set({name,at:Date.now()}));
+    render(true);
+  }else if(kind==='addcur'){
+    const c=g('cur');const t=trip();if(!c)return;
+    w(()=>q('t:'+S.tid,()=>dbp('trips/'+S.tid).update({currencies:(t.currencies||[]).concat([c])})));
+  }else if(kind==='trip'){
+    const minDays=Math.max(1,...S.td.plan.map(p=>p.day||1));
+    const data={name:g('name'),dest:g('dest'),start:g('start'),days:Math.max(minDays,Math.min(60,parseInt(g('days'))||1))};
+    if(!data.name)return;
+    closeSheet();w(()=>q('t:'+S.tid,()=>dbp('trips/'+S.tid).update(data)));
+  }else if(kind==='ovcur'){
+    const cur=g('cur');const fx=Object.assign({},S.fx||{});
+    form.querySelectorAll('[data-fx]').forEach(i=>{const v=parseFloat(i.value);if(v>0)fx[i.dataset.fx]=v;});
+    S.fx=fx;S.ovCur=cur;ls('tb-fx',JSON.stringify(fx));ls('tb-ovcur',cur);
+    closeSheet();render(true);
+  }else if(kind==='copy'){
+    const src=form.dataset.src;const o={name:g('name'),start:g('start'),withPlan:!!fd.get('withPlan'),withPack:!!fd.get('withPack'),withPeople:!!fd.get('withPeople'),withRates:!!fd.get('withRates')};
+    if(!o.name)return;
+    closeSheet();toast('複製中…');
+    const tid=await w(()=>copyTrip(src,o));if(tid)go(tid);
+  }
+});
+document.addEventListener('input',ev=>{
+  const i=ev.target.closest&&ev.target.closest('[data-est]');if(!i)return;
+  const n=Math.max(0,Math.min(365,parseFloat(i.value)||0));S.estDays=n;
+  const out=document.getElementById(i.dataset.for);
+  if(out)out.textContent=money(n*parseFloat(i.dataset.perday),i.dataset.cur);
+});
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&!$('#layer').hidden)closeSheet();});
+
+boot();
+})();
+</script>
+
+</body></html>
