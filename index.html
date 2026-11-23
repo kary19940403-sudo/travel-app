@@ -260,7 +260,14 @@ select{text-overflow:ellipsis}
 /* ===== 後端轉接層：讓原本的 window.claude.use('db'/'user') 在 GitHub Pages 上也能運作 =====
    - FIREBASE_CONFIG 留 null：「本機模式」，資料存在這個瀏覽器的 localStorage（只有自己一個人用）。
    - 貼上 Firebase 設定：「多人同步模式」，用 Firestore + 匿名登入，旅伴可共用同一趟旅行。 */
-const FIREBASE_CONFIG = null;
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBbiTMm_ZbZTEW5nQa5HbSRtJhtJvSrlks",
+  authDomain: "travel-notebook-ea0dd.firebaseapp.com",
+  projectId: "travel-notebook-ea0dd",
+  storageBucket: "travel-notebook-ea0dd.firebasestorage.app",
+  messagingSenderId: "437317171983",
+  appId: "1:437317171983:web:8b7fd953bf961084f11c7a"
+};
 /* 例：
 const FIREBASE_CONFIG = {
   apiKey: "...", authDomain: "xxx.firebaseapp.com", projectId: "xxx",
@@ -307,7 +314,29 @@ async function firebaseBackend(cfg){
   firebase.initializeApp(cfg);
   const auth=firebase.auth(),fs=firebase.firestore();
   try{fs.enablePersistence({synchronizeTabs:true}).catch(()=>{});}catch(e){}
-  if(!auth.currentUser){await new Promise((res,rej)=>{const u=auth.onAuthStateChanged(x=>{if(x){u();res();}});auth.signInAnonymously().catch(rej);});}
+  /* Google 登入：已登入就直接用；否則顯示登入畫面 */
+  const user0=await new Promise(res=>{const u=auth.onAuthStateChanged(x=>{u();res(x);});});
+  if(!user0){
+    await new Promise(res=>{
+      const ov=document.createElement('div');
+      ov.style.cssText='position:fixed;inset:0;z-index:100;background:var(--bg,#d7e8f8);display:grid;place-items:center;padding:24px';
+      ov.innerHTML='<div style="max-width:360px;text-align:center;display:grid;gap:14px"><h1 style="margin:0;font-size:28px;color:var(--accent,#6a54b0)">旅伴手帳</h1><p style="margin:0;color:var(--muted,#52607f)">用 Google 帳號登入，換手機或換瀏覽器也能找回你的旅行資料。</p><button id="tb-g" class="btn primary" style="width:100%">用 Google 登入</button><div id="tb-ge" class="hint bad"></div></div>';
+      document.body.appendChild(ov);
+      const err=m=>{ov.querySelector('#tb-ge').textContent=m;};
+      const done=()=>{ov.remove();res();};
+      auth.onAuthStateChanged(x=>{if(x)done();});
+      auth.getRedirectResult().catch(e=>err('登入失敗（'+(e.code||'錯誤')+'）'));
+      ov.querySelector('#tb-g').addEventListener('click',()=>{
+        err('');
+        const p=new firebase.auth.GoogleAuthProvider();
+        auth.signInWithPopup(p).catch(e=>{
+          if(e.code==='auth/popup-blocked'||e.code==='auth/operation-not-supported-in-this-environment'){auth.signInWithRedirect(p);return;}
+          if(e.code==='auth/popup-closed-by-user'||e.code==='auth/cancelled-popup-request')return;
+          err(e.code==='auth/unauthorized-domain'?'這個網址還沒加入 Firebase 的授權網域':e.code==='auth/operation-not-allowed'?'Firebase 尚未啟用 Google 登入':'登入失敗（'+(e.code||'錯誤')+'）');
+        });
+      });
+    });
+  }
   const fix=e=>{if(e&&e.code==='permission-denied')e.code='invalid_argument';throw e;};
   const doc=path=>{const r=fs.doc(path);return {
     set:v=>r.set(v).catch(fix),
