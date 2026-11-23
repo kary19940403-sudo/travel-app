@@ -217,6 +217,20 @@ textarea{min-height:70px;resize:vertical}
 .est{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--accent-soft)}
 .ovctl{display:grid;gap:10px;margin:8px 0 4px}
 .est input{width:76px;min-height:38px;text-align:center}
+/* layout hardening: keep grid/flex children from stretching past their box */
+.ovctl,.stack,.passes,.ovc{grid-template-columns:minmax(0,1fr)}
+.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width:420px){.two{grid-template-columns:minmax(0,1fr)}.two.keep{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.two>*,.f,.card,.ovc,.cmp{min-width:0}
+select,input[type=text],input[type=number],input[type=date],input[type=time]{max-width:100%}
+select{text-overflow:ellipsis}
+.cmph{flex-wrap:wrap;row-gap:2px}
+.cmph b{flex:1 1 150px;min-width:0}
+.cmph .num{white-space:nowrap}
+.tagx{white-space:nowrap}
+.seg button{padding:9px 6px;line-height:1.25;font-size:13px}
+.kv b{font-size:14px}
+.chip{max-width:100%}
 .est b{font-size:18px;font-variant-numeric:tabular-nums;color:var(--accent)}
 .pass::before,.pass::after{content:"";position:absolute;top:calc(50% - 9px);width:18px;height:18px;border-radius:50%;background:var(--bg)}
 .pass::before{left:-9px}.pass::after{right:-9px}
@@ -920,6 +934,12 @@ function mineSum(list,t){const rates=t.rates||{};let sum=0,missing=0;const byCat
 function mineLine(id,t){const l=(S.mine[id]&&S.mine[id].mine)||[];if(!l.length)return '';return '<span class="pass-sub">我的記帳 '+money(mineSum(l,t).sum,t.base)+'</span>';}
 function spendSeg(){const v=S.spendView==='mine'?'mine':S.spendView==='pub'?'pub':'shared';const b=(k,l)=>'<button data-act="spend-view" data-v="'+k+'" class="'+(v===k?'on':'')+'">'+l+'</button>';return '<div class="seg" role="group" aria-label="記帳類型">'+b('shared','共同分帳')+b('mine','我的花費')+b('pub','旅伴公開')+'</div>';}
 function viewSpend(t){return spendSeg()+(S.spendView==='mine'?viewMine(t):S.spendView==='pub'?viewPub(t):viewShared(t));}
+function pubCopyBtn(e,me){
+  if(!me||e.owner===me)return '';
+  const done=(P().mine||[]).some(x=>x.from===e.id);
+  return done?'<div class="sub" style="margin-top:2px">✓ 已複製到我的花費</div>'
+    :'<div style="margin-top:6px"><button class="btn small" data-act="copy-pub" data-id="'+e.id+'">複製到我的花費</button></div>';
+}
 function viewPub(t){
   const bc=t.base,me=meId();
   const list=S.td.pub.slice();
@@ -928,14 +948,14 @@ function viewPub(t){
   const groups={};
   list.forEach(e=>{const k=e.cat||'其他';(groups[k]=groups[k]||[]).push(e);});
   const order=['機票','住宿'].filter(k=>groups[k]).concat(Object.keys(groups).filter(k=>k!=='機票'&&k!=='住宿').sort());
-  return '<div class="sub">這裡只有旅伴自己選擇公開的項目。要修改或取消公開，請到「我的花費」。</div>'+order.map(cat=>{
+  return '<div class="sub">這裡只有旅伴自己選擇公開的項目。要修改或取消公開，請到「我的花費」。看到跟自己一樣的花費，可以按「複製到我的花費」存成自己的記帳，不用重打。</div>'+order.map(cat=>{
     const items=groups[cat].map(e=>{const v=conv(e);const legs=cat==='機票'&&e.ft==='來回'?2:1;return {e,v,legs,per:v==null?null:v/legs};})
       .sort((a,b)=>(a.per==null?Infinity:a.per)-(b.per==null?Infinity:b.per));
     const mxv=Math.max(1,...items.map(x=>x.per==null?0:x.per));
     return '<section class="card"><h3>'+esc(cat)+'（旅伴公開）</h3>'+items.map(x=>{
       const e=x.e;
       return '<div class="cmp"><div class="cmph"><b>'+esc(pname(e.owner))+(e.owner===me?'<span class="tagx">我</span>':'')+' · '+esc(e.title)+(e.ft?'<span class="tagx">'+esc(e.ft)+'</span>':'')+'</b><span class="num">'+money(e.amount,e.cur)+'</span></div>'+
-        (x.per==null?'<div class="sub">未設定匯率，尚未換算</div>':'<div class="ovbar"><i style="width:'+Math.max(3,Math.round(x.per/mxv*100))+'%"></i></div><div class="sub">'+(e.cur!==bc?'≈ '+money(x.v,bc)+'，':'')+(cat==='機票'?(x.legs===2?'來回 2 段，':'')+'每段約 '+money(x.per,bc):(e.date?esc(e.date):''))+'</div>')+'</div>';
+        (x.per==null?'<div class="sub">未設定匯率，尚未換算</div>':'<div class="ovbar"><i style="width:'+Math.max(3,Math.round(x.per/mxv*100))+'%"></i></div><div class="sub">'+(e.cur!==bc?'≈ '+money(x.v,bc)+'，':'')+(cat==='機票'?(x.legs===2?'來回 2 段，':'')+'每段約 '+money(x.per,bc):(e.date?esc(e.date):''))+'</div>')+pubCopyBtn(e,me)+'</div>';
     }).join('')+'</section>';
   }).join('');
 }
@@ -958,7 +978,7 @@ function viewMine(t){
   '<section><h2 class="sec" style="margin-top:6px">我的明細</h2>'+(list.length?list.map(e=>{
     const r=e.cur===bc?1:Number(t.rates&&t.rates[e.cur]);
     const conv=e.cur!==bc?(r>0?'≈ '+money(e.amount*r,bc):'未設定匯率'):'';
-    return '<button class="exp" data-act="edit-mine" data-id="'+e.id+'"><span class="grow"><b>'+esc(e.title)+'<span class="tagx">'+esc(e.cat||'其他')+'</span>'+(e.ft?'<span class="tagx">'+esc(e.ft)+'</span>':'')+(e.pub?'<span class="tagx">公開</span>':'')+'</b>'+(e.date?'<span class="sub">'+esc(e.date)+'</span>':'')+'</span><span class="r">'+money(e.amount,e.cur)+(conv?'<small>'+esc(conv)+'</small>':'')+'</span></button>';}).join('')
+    return '<button class="exp" data-act="edit-mine" data-id="'+e.id+'"><span class="grow"><b>'+esc(e.title)+'<span class="tagx">'+esc(e.cat||'其他')+'</span>'+(e.ft?'<span class="tagx">'+esc(e.ft)+'</span>':'')+(e.pub?'<span class="tagx">公開</span>':'')+'</b>'+(e.date?'<span class="sub">'+esc(e.date)+'</span>':'')+(e.note?'<span class="sub" style="white-space:pre-wrap;overflow-wrap:anywhere">備註：'+esc(e.note)+'</span>':'')+'</span><span class="r">'+money(e.amount,e.cur)+(conv?'<small>'+esc(conv)+'</small>':'')+'</span></button>';}).join('')
    :'<div class="empty">還沒有個人花費。機票、車票、住宿這些自己出的錢，按右下角「＋ 我的花費」記下來。</div>')+'</section>';
 }
 function openMine(id){
@@ -972,6 +992,7 @@ function openMine(id){
    
    
    '<label class="f"><span>日期（可不填）</span><input type="date" name="date" value="'+esc(e?(e.date||''):'')+'"></label>'+
+   '<label class="f"><span>備註（只有你自己看得到）</span><textarea name="note" maxlength="300" placeholder="例如：12/3 去、12/9 回；訂位代號；哪一間店">'+esc(e?(e.note||''):'')+'</textarea></label>'+
    '<div><label class="chk"><input type="checkbox" name="pub"'+(e&&e.pub?' checked':'')+'><span class="box"></span><span class="txt">讓旅伴也看得到這一筆</span></label><div class="sub">預設只有你自己看得到。公開後，旅伴能在「旅伴公開」看到名稱、金額和分類，隨時可以取消。</div></div>'+
    '<div class="actions">'+(e?'<button type="button" class="btn danger grow" data-sx="del">刪除</button>':'')+'<button class="btn primary">儲存</button></div></form>',
    body=>{
@@ -990,7 +1011,8 @@ function saveMine(form){
   if(!title||!(amount>0)){toast('請填寫名稱與金額');return;}
   const list=(P().mine||[]).slice();const old=id?list.find(x=>x.id===id):null;
   const cat=String(fd.get('cat'));
-  const entry={id:id||rid(6),title,amount,cur:String(fd.get('cur')),cat,ft:cat==='機票'?String(fd.get('ft')||''):'',date:String(fd.get('date')||''),pub:!!fd.get('pub'),at:old&&old.at?old.at:Date.now()};
+  const entry={id:id||rid(6),title,amount,cur:String(fd.get('cur')),cat,ft:cat==='機票'?String(fd.get('ft')||''):'',date:String(fd.get('date')||''),note:String(fd.get('note')||'').trim(),pub:!!fd.get('pub'),at:old&&old.at?old.at:Date.now()};
+  if(old&&old.from)entry.from=old.from;
   const mine=id?list.map(x=>x.id===id?entry:x):list.concat([entry]);
   const owner=meId();
   closeSheet();
@@ -1047,7 +1069,7 @@ function viewShared(t){
   '<section><h2 class="sec" style="margin-top:6px">明細</h2>'+tcatBar(t)+(list.length?list.map(e=>{
     const r=e.cur===bc?1:Number(t.rates&&t.rates[e.cur]);
     const conv=e.cur!==bc?(r>0?'≈ '+money(e.amount*r,bc):'未設定匯率'):'';
-    return '<button class="exp" data-act="edit-spend" data-id="'+e.id+'"><span class="grow"><b>'+esc(e.title)+(e.mode==='transfer'?'<span class="tagx">還款</span>':'')+(e.cat&&e.mode!=='transfer'?'<span class="tagx">'+esc(e.cat)+'</span>':'')+(e.ft&&e.mode!=='transfer'?'<span class="tagx">'+esc(e.ft)+'</span>':'')+settleTag(e)+'</b><span class="sub">'+esc(pname(e.payer))+' 先付 · '+esc(splitLabel(e))+'</span></span><span class="r">'+money(e.amount,e.cur)+(conv?'<small>'+esc(conv)+'</small>':'')+'</span></button>';}).join('')
+    return '<button class="exp" data-act="edit-spend" data-id="'+e.id+'"><span class="grow"><b>'+esc(e.title)+(e.mode==='transfer'?'<span class="tagx">還款</span>':'')+(e.cat&&e.mode!=='transfer'?'<span class="tagx">'+esc(e.cat)+'</span>':'')+(e.ft&&e.mode!=='transfer'?'<span class="tagx">'+esc(e.ft)+'</span>':'')+settleTag(e)+'</b><span class="sub">'+esc(pname(e.payer))+' 先付 · '+esc(splitLabel(e))+'</span>'+(e.note?'<span class="sub" style="white-space:pre-wrap;overflow-wrap:anywhere">備註：'+esc(e.note)+'</span>':'')+'</span><span class="r">'+money(e.amount,e.cur)+(conv?'<small>'+esc(conv)+'</small>':'')+'</span></button>';}).join('')
    :'<div class="empty">還沒有帳目。誰先付了錢，就按「＋ 記一筆」。</div>')+'</section>';
 }
 function openExpense(id){
@@ -1074,6 +1096,7 @@ function openExpense(id){
    '<div><div class="lbl">怎麼分</div><div class="seg" id="x-mode"><button type="button" data-mode="equal">平分</button><button type="button" data-mode="custom">各自指定金額</button><button type="button" data-mode="treat">請客</button></div></div>'+
    '<div id="x-equal"><div class="lbl">誰要分攤（只選一個人就是幫他全付）</div><div class="chips">'+ppl.map(p=>'<button type="button" class="chip" data-p="'+p.id+'">'+esc(p.name)+'</button>').join('')+'</div></div>'+
    '<div id="x-custom"><div class="lbl">每個人這次花多少（可以不分給某些人）</div>'+ppl.map(p=>'<label class="crow"><span>'+esc(p.name)+'</span><input type="number" inputmode="decimal" step="any" min="0" data-c="'+p.id+'" value="'+(custom[p.id]?esc(custom[p.id]):'')+'"></label>').join('')+'<button type="button" class="link" data-sx="rest">把剩下的算給付款人</button></div>'+
+   '<label class="f"><span>備註（所有旅伴都看得到）</span><textarea name="note" maxlength="300" placeholder="例如：哪一間店、幾號吃的">'+esc(e?(e.note||''):'')+'</textarea></label>'+
    '<div id="x-hint" class="hint"></div>'+
    '<div id="x-settled"><div class="lbl">誰已經當場付給付款人了？（點一下標記）</div><div class="chips" id="x-settled-chips"></div><button type="button" class="link" data-sx="allpaid">全部標記已付</button><div class="sub">標記後，這一筆不會再出現在「誰要給誰」裡，但還是計入大家的花費。</div></div>'+
    
@@ -1136,6 +1159,7 @@ async function saveExpense(form){
   const data={title,amount,cur,payer:String(fd.get('payer')),mode:st.mode,cat:String(fd.get('cat')),among:[],custom:{},at:Date.now()};
   const old=id?S.td.spend.find(x=>x.id===id):null;if(old&&old.at)data.at=old.at;
   data.ft=data.cat==='機票'?String(fd.get('ft')||''):'';
+  data.note=String(fd.get('note')||'').trim();
   if(st.mode==='equal'){
     data.among=[...st.among];
     if(!data.among.length){toast('請至少選一位分攤的人');return;}
@@ -1327,6 +1351,13 @@ document.addEventListener('click',ev=>{
     case 'add-mine':openMine();break;
     case 'edit-mine':openMine(d.id);break;
     case 'add-spend':openExpense();break;
+    case 'copy-pub':{
+      const pe=S.td.pub.find(x=>x.id===d.id);if(!pe)break;
+      const tid=S.tid,mine=(P().mine||[]).slice();
+      if(mine.some(x=>x.from===pe.id)){toast('已經複製過了');break;}
+      mine.push({id:rid(6),title:pe.title,amount:pe.amount,cur:pe.cur,cat:pe.cat||'其他',ft:pe.ft||'',date:pe.date||'',note:'',pub:false,at:Date.now(),from:pe.id});
+      w(()=>q('p:'+tid,()=>dbp('data/users/'+S.uid+'/'+tid).update({mine})));
+      toast('已複製到「我的花費」');break;}
     case 'edit-spend':openExpense(d.id);break;
     case 'settle':{
       const key='settle:'+d.from+':'+d.to;const t=trip();

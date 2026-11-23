@@ -1,5 +1,5 @@
 /* Offline cache. Bump CACHE when you want every device to refetch the app files. */
-const CACHE = 'travel-companion-v1';
+const CACHE = 'travel-companion-v3';
 const CORE = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
