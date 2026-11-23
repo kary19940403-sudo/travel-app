@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>旅伴手帳</title>
 <meta name="theme-color" content="#d7e8f8">
-<style>[hidden]:not([hidden=until-found i]){display:none!important}html{scroll-padding-top:env(safe-area-inset-top,0px)}img{max-width:100%}</style>
+<style>[hidden]:not([hidden=until-found i]){display:none!important}html{scroll-padding-top:env(safe-area-inset-top,0px)}img{max-width:100%}html.solo [data-act="join-code"]{display:none!important}</style>
 </head>
 <body>
 
@@ -327,11 +327,7 @@ window.claude={use:async name=>{
   if(name==='user')return {id:b.uid,can:async()=>true};
   return null;
 }};
-if(!FIREBASE_CONFIG)window.addEventListener('DOMContentLoaded',()=>{
-  const n=document.createElement('div');n.className='note warn';n.style.cssText='max-width:640px;margin:8px auto 0';
-  n.textContent='目前是「本機模式」：資料只存在這個瀏覽器，旅伴無法同步。要多人共用請設定 Firebase（見 README）。';
-  document.body.insertBefore(n,document.body.firstChild);
-});
+if(!FIREBASE_CONFIG)document.documentElement.classList.add('solo');
 })();
 </script>
 
