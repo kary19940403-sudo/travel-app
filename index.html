@@ -1,6 +1,15 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>旅伴手帳</title>
-<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#d7e8f8">
+<style>[hidden]:not([hidden=until-found i]){display:none!important}html{scroll-padding-top:env(safe-area-inset-top,0px)}img{max-width:100%}</style>
+</head>
+<body>
+
+
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap">
 <style>
 /* Layout: one column, bottom tab bar (行程 / 行李 / 記帳 / 設定), every form opens as a bottom sheet.
@@ -246,6 +255,85 @@ select{text-overflow:ellipsis}
 <div id="app"><div class="empty" style="margin-top:40px">載入中…</div></div>
 <div id="layer" hidden><div class="scrim" data-act="close-sheet"></div><div id="sheet" role="dialog" aria-modal="true"></div></div>
 <div id="toast" hidden></div>
+
+<script>
+/* ===== 後端轉接層：讓原本的 window.claude.use('db'/'user') 在 GitHub Pages 上也能運作 =====
+   - FIREBASE_CONFIG 留 null：「本機模式」，資料存在這個瀏覽器的 localStorage（只有自己一個人用）。
+   - 貼上 Firebase 設定：「多人同步模式」，用 Firestore + 匿名登入，旅伴可共用同一趟旅行。 */
+const FIREBASE_CONFIG = null;
+/* 例：
+const FIREBASE_CONFIG = {
+  apiKey: "...", authDomain: "xxx.firebaseapp.com", projectId: "xxx",
+  storageBucket: "xxx.appspot.com", messagingSenderId: "...", appId: "..."
+};
+*/
+(function(){
+'use strict';
+const isObj=v=>v&&typeof v==='object'&&!Array.isArray(v);
+function merge(a,b){const o=Object.assign({},a);for(const k in b){o[k]=isObj(b[k])&&isObj(o[k])?merge(o[k],b[k]):b[k];}return o;}
+const clone=v=>JSON.parse(JSON.stringify(v));
+const parent=p=>p.slice(0,p.lastIndexOf('/'));
+const seg=p=>p.split('/').length;
+
+/* ---------- 本機模式 ---------- */
+function localBackend(){
+  const KEY='tb-localdb',UK='tb-localuid';
+  const load=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'{}')||{};}catch(e){return {};}};
+  let data=load();const subs=new Set();
+  const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){const er=new Error('quota');er.code='quota_exceeded';throw er;}};
+  const snapOf=cp=>{const docs=Object.keys(data).filter(k=>parent(k)===cp&&seg(k)===seg(cp)+1).map(k=>({id:k.slice(cp.length+1),data:()=>clone(data[k])}));return {docs};};
+  const fire=()=>subs.forEach(s=>{try{s.cb(snapOf(s.path));}catch(e){}});
+  window.addEventListener('storage',e=>{if(e.key===KEY){data=load();fire();}});
+  const doc=path=>({
+    async set(v){data[path]=clone(v);save();fire();},
+    async update(v){data[path]=merge(data[path]||{},clone(v));save();fire();},
+    async delete(){delete data[path];save();fire();},
+    async get(){return {exists:path in data,id:path.split('/').pop(),data:()=>clone(data[path]||{})};}
+  });
+  const collection=path=>({
+    onSnapshot(cb){const s={path,cb};subs.add(s);setTimeout(()=>cb(snapOf(path)),0);return()=>subs.delete(s);},
+    async get(){return snapOf(path);}
+  });
+  let uid=localStorage.getItem(UK);if(!uid){uid='local'+Math.random().toString(36).slice(2,10);localStorage.setItem(UK,uid);}
+  return {db:{doc,collection},uid:async()=>uid};
+}
+
+/* ---------- Firebase 模式 ---------- */
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('load '+src));document.head.appendChild(s);});}
+async function firebaseBackend(cfg){
+  const V='10.12.2',B='https://www.gstatic.com/firebasejs/'+V+'/';
+  await loadScript(B+'firebase-app-compat.js');
+  await Promise.all([loadScript(B+'firebase-auth-compat.js'),loadScript(B+'firebase-firestore-compat.js')]);
+  firebase.initializeApp(cfg);
+  const auth=firebase.auth(),fs=firebase.firestore();
+  try{fs.enablePersistence({synchronizeTabs:true}).catch(()=>{});}catch(e){}
+  if(!auth.currentUser){await new Promise((res,rej)=>{const u=auth.onAuthStateChanged(x=>{if(x){u();res();}});auth.signInAnonymously().catch(rej);});}
+  const fix=e=>{if(e&&e.code==='permission-denied')e.code='invalid_argument';throw e;};
+  const doc=path=>{const r=fs.doc(path);return {
+    set:v=>r.set(v).catch(fix),
+    update:v=>r.set(v,{merge:true}).catch(fix),   // 巢狀物件深度合併、陣列整個取代，與原本行為一致
+    delete:()=>r.delete().catch(fix)};};
+  const collection=path=>{const c=fs.collection(path);return {
+    onSnapshot:(cb,err)=>c.onSnapshot(s=>cb({docs:s.docs.map(d=>({id:d.id,data:()=>d.data()}))}),err),
+    get:()=>c.get().then(s=>({docs:s.docs.map(d=>({id:d.id,data:()=>d.data()}))}))};};
+  return {db:{doc,collection},uid:async()=>auth.currentUser.uid};
+}
+
+let backendP=null;
+const backend=()=>backendP||(backendP=FIREBASE_CONFIG?firebaseBackend(FIREBASE_CONFIG):Promise.resolve(localBackend()));
+window.claude={use:async name=>{
+  const b=await backend();
+  if(name==='db')return b.db;
+  if(name==='user')return {id:b.uid,can:async()=>true};
+  return null;
+}};
+if(!FIREBASE_CONFIG)window.addEventListener('DOMContentLoaded',()=>{
+  const n=document.createElement('div');n.className='note warn';n.style.cssText='max-width:640px;margin:8px auto 0';
+  n.textContent='目前是「本機模式」：資料只存在這個瀏覽器，旅伴無法同步。要多人共用請設定 Firebase（見 README）。';
+  document.body.insertBefore(n,document.body.firstChild);
+});
+})();
+</script>
 
 <script>
 (function(){
@@ -1214,4 +1302,180 @@ document.addEventListener('click',ev=>{
       render(true);break;}
     case 'cmp-view':S.cmpView=d.v;render(true);break;
     case 'ov-cur':openOvCur();break;
-    case 'home-tab':S.homeTab=d.v;if(d.v==='ov')ensureOv();
+    case 'home-tab':S.homeTab=d.v;if(d.v==='ov')ensureOv();render(true);break;
+    case 'open-ov':S.nextTab='spend';S.spendView='mine';location.hash='#t-'+d.id;break;
+    case 'new-trip':openNewTrip();break;
+    case 'join-code':openJoin();break;
+    case 'copy-trip':openCopy(d.id);break;
+    case 'copy-trip-here':openCopy(S.tid);break;
+    case 'copy-code':{
+      const code=d.code;
+      const fail=()=>toast('房間代碼：'+code+'（請手動複製）');
+      try{navigator.clipboard.writeText(code).then(()=>toast('已複製房間代碼 '+code),fail);}catch(e){fail();}
+      break;}
+    case 'tab':S.tab=d.tab;S.armed=null;render(true);window.scrollTo(0,0);break;
+    case 'day':S.day=+d.day;render(true);break;
+    case 'rm-day':{
+      const t=trip();const n=Math.max(t.days||1,...S.td.plan.map(p=>p.day||1));
+      if(n<=1)break;
+      arm('rm-day',()=>{const tid=S.tid;const gone=S.td.plan.filter(p=>(p.day||1)===n);if(S.day>=n)S.day=n-1;
+        w(async()=>{for(const p of gone)await dbp('trips/'+tid+'/plan/'+p.id).delete();await q('t:'+tid,()=>dbp('trips/'+tid).update({days:n-1}));});});
+      break;}
+    case 'add-day':{const t=trip();const n=Math.max(t.days||1,...S.td.plan.map(p=>p.day||1))+1;S.day=n;w(()=>q('t:'+S.tid,()=>dbp('trips/'+S.tid).update({days:n})));break;}
+    case 'mv-plan':movePlan(d.id,+d.dir);break;
+    case 'sort-time':sortDayByTime();break;
+    case 'add-plan':openPlan();break;
+    case 'edit-plan':openPlan(d.id);break;
+    case 'pack-scope':S.packScope=d.scope;render(true);break;
+    case 'quick-pack':addPack(d.text,S.packScope);break;
+    case 'del-pack':{
+      const kind=d.kind,id=d.id;
+      arm('pack:'+kind+':'+id,()=>{
+        if(kind==='all')w(()=>dbp('trips/'+S.tid+'/pack/'+id).delete());
+        else{const extra=(P().extra||[]).filter(x=>x.id!==id);const tid=S.tid;w(()=>q('p:'+tid,()=>dbp('data/users/'+S.uid+'/'+tid).update({extra})));}
+      });break;}
+    case 'spend-view':S.spendView=d.v;S.armed=null;render(true);break;
+    case 'add-mine':openMine();break;
+    case 'edit-mine':openMine(d.id);break;
+    case 'add-spend':openExpense();break;
+    case 'copy-pub':{
+      const pe=S.td.pub.find(x=>x.id===d.id);if(!pe)break;
+      const tid=S.tid,mine=(P().mine||[]).slice();
+      if(mine.some(x=>x.from===pe.id)){toast('已經複製過了');break;}
+      mine.push({id:rid(6),title:pe.title,amount:pe.amount,cur:pe.cur,cat:pe.cat||'其他',ft:pe.ft||'',date:pe.date||'',note:'',pub:false,at:Date.now(),from:pe.id});
+      w(()=>q('p:'+tid,()=>dbp('data/users/'+S.uid+'/'+tid).update({mine})));
+      toast('已複製到「我的花費」');break;}
+    case 'edit-spend':openExpense(d.id);break;
+    case 'settle':{
+      const key='settle:'+d.from+':'+d.to;const t=trip();
+      arm(key,()=>w(()=>dbp('trips/'+S.tid+'/spend/'+rid(8)).set({title:'還款',amount:+d.amt,cur:t.base,payer:d.from,mode:'transfer',among:[d.to],custom:{},cat:'',at:Date.now()})));
+      break;}
+    case 'rename-person':openRename(d.id);break;
+    case 'set-me':{const tid=S.tid;w(()=>q('p:'+tid,()=>dbp('data/users/'+S.uid+'/'+tid).update({me:d.id})));break;}
+    case 'del-person':{
+      const id=d.id;
+      const used=S.td.spend.some(e=>e.payer===id||(e.among||[]).includes(id)||(e.custom&&e.custom[id]!=null));
+      if(used){toast('這位旅伴已有帳目，不能移除。');break;}
+      if(S.td.people.length<=1){toast('至少要留一位旅伴。');break;}
+      arm('person:'+id,()=>w(()=>dbp('trips/'+S.tid+'/people/'+id).delete()));break;}
+    case 'del-cur':{
+      const c=d.cur;
+      if(S.td.spend.some(e=>e.cur===c)){toast(c+' 已有帳目，不能移除。');break;}
+      const t=trip();const next=(t.currencies||[]).filter(x=>x!==c);
+      w(()=>q('t:'+S.tid,()=>dbp('trips/'+S.tid).update({currencies:next})));break;}
+    case 'edit-trip':openTripForm();break;
+    case 'leave':{
+      const tid=S.tid;
+      arm('leave',async()=>{await w(()=>dbp('data/users/'+S.uid+'/'+tid).delete());location.hash='';});break;}
+  }
+});
+document.addEventListener('change',ev=>{
+  const ot=ev.target.closest('[data-ov-trip]');
+  if(ot){S.ovTrip=ot.value;render(true);return;}
+  const ci=ev.target.closest('[data-cmp-item]');if(ci){S.cmpItem=ci.value;render(true);return;}
+  const cb=ev.target.closest('[data-cmp-basis]');if(cb){S.cmpBasis=cb.value;render(true);return;}
+  const ds=ev.target.closest('[data-dest-sel]');
+  if(ds){
+    const inp=ds.closest('form').querySelector('input[name=dest]');const v=ds.value;
+    if(v==='__other'){if(DESTS.includes(inp.value))inp.value='';inp.hidden=false;try{inp.focus();}catch(e){}}
+    else{inp.value=v;inp.hidden=true;}
+    return;
+  }
+  const c=ev.target.closest('[data-pack]');
+  if(c){
+    const kind=c.dataset.pack,id=c.dataset.id,on=c.checked,tid=S.tid;
+    if(kind==='all')w(()=>q('p:'+tid,()=>dbp('data/users/'+S.uid+'/'+tid).update({checked:{[id]:on}})));
+    else{const extra=(P().extra||[]).map(x=>x.id===id?Object.assign({},x,{done:on}):x);w(()=>q('p:'+tid,()=>dbp('data/users/'+S.uid+'/'+tid).update({extra})));}
+    return;
+  }
+  const r=ev.target.closest('[data-rate]');
+  if(r){
+    const cur=r.dataset.rate,v=parseFloat(r.value);
+    if(!(v>0)){toast('匯率要大於 0');return;}
+    w(()=>q('t:'+S.tid,()=>dbp('trips/'+S.tid).update({rates:{[cur]:v}})));
+  }
+});
+document.addEventListener('submit',async ev=>{
+  const form=ev.target.closest('form[data-form]');if(!form)return;
+  ev.preventDefault();
+  const kind=form.dataset.form;const fd=new FormData(form);
+  const g=n=>String(fd.get(n)==null?'':fd.get(n)).trim();
+  if(kind==='newtrip'){
+    const st=form._st;const base=g('base');
+    const currencies=[...st.cur].filter(c=>c!==base);
+    const rates={};currencies.forEach(c=>{const r=parseFloat(st.rates[c]);if(r>0)rates[c]=r;});
+    const v={name:g('name'),dest:g('dest'),start:g('start'),days:Math.max(1,Math.min(60,parseInt(g('days'))||1)),me:g('me'),base,currencies,rates};
+    if(!v.name||!v.me)return;
+    ls('tb-name',v.me);closeSheet();
+    const tid=await w(()=>createTrip(v));if(tid)go(tid);
+  }else if(kind==='joincode'||kind==='gate'){
+    const code=g('code').toUpperCase().replace(/[^A-Z0-9]/g,'');
+    const id=Object.keys(S.trips).find(k=>S.trips[k].code===code);
+    if(!id||(kind==='gate'&&id!==S.tid)){toast('找不到這組房間代碼，請再確認一次。');return;}
+    if(S.mine[id]){closeSheet();go(id);return;}
+    closeSheet();startJoin(id);
+  }else if(kind==='identity'){
+    const tid=form.dataset.tid;const name=g('name');let pid=form._pid;
+    if(!pid&&!name){toast('請選擇你是誰，或輸入名字');return;}
+    closeSheet();
+    const ok=await w(async()=>{
+      if(!pid){pid=rid(8);await S.db.doc('trips/'+tid+'/people/'+pid).set({name,at:Date.now()});ls('tb-name',name);}
+      await S.db.doc('data/users/'+S.uid+'/'+tid).set({me:pid,joinedAt:Date.now(),checked:{},extra:[]});return true;});
+    if(ok)go(tid);
+  }else if(kind==='plan'){
+    const id=form.dataset.id;const title=g('title');if(!title)return;
+    const old=id?S.td.plan.find(x=>x.id===id):null;
+    closeSheet();
+    w(()=>dbp('trips/'+S.tid+'/plan/'+(id||rid(8))).set({day:parseInt(g('day'))||1,time:g('time'),title,note:g('note'),at:old&&old.at?old.at:Date.now(),...(old&&old.ord!=null?{ord:old.ord}:{})}));
+    S.day=parseInt(g('day'))||1;
+  }else if(kind==='rename'){
+    const id=form.dataset.id,name=g('name');if(!name)return;
+    closeSheet();
+    w(()=>q('n:'+id,()=>dbp('trips/'+S.tid+'/people/'+id).update({name})));
+  }else if(kind==='mine'){
+    saveMine(form);
+  }else if(kind==='expense'){
+    saveExpense(form);
+  }else if(kind==='addpack'){
+    const text=g('text');if(!text)return;
+    await addPack(text,S.packScope);
+    render(true);const i=$('#pk-input');if(i)i.focus();
+  }else if(kind==='addperson'){
+    const name=g('name');if(!name)return;
+    await w(()=>dbp('trips/'+S.tid+'/people/'+rid(8)).set({name,at:Date.now()}));
+    render(true);
+  }else if(kind==='addcur'){
+    const c=g('cur');const t=trip();if(!c)return;
+    w(()=>q('t:'+S.tid,()=>dbp('trips/'+S.tid).update({currencies:(t.currencies||[]).concat([c])})));
+  }else if(kind==='trip'){
+    const minDays=Math.max(1,...S.td.plan.map(p=>p.day||1));
+    const data={name:g('name'),dest:g('dest'),start:g('start'),days:Math.max(minDays,Math.min(60,parseInt(g('days'))||1))};
+    if(!data.name)return;
+    closeSheet();w(()=>q('t:'+S.tid,()=>dbp('trips/'+S.tid).update(data)));
+  }else if(kind==='ovcur'){
+    const cur=g('cur');const fx=Object.assign({},S.fx||{});
+    form.querySelectorAll('[data-fx]').forEach(i=>{const v=parseFloat(i.value);if(v>0)fx[i.dataset.fx]=v;});
+    S.fx=fx;S.ovCur=cur;ls('tb-fx',JSON.stringify(fx));ls('tb-ovcur',cur);
+    closeSheet();render(true);
+  }else if(kind==='copy'){
+    const src=form.dataset.src;const o={name:g('name'),start:g('start'),withPlan:!!fd.get('withPlan'),withPack:!!fd.get('withPack'),withPeople:!!fd.get('withPeople'),withRates:!!fd.get('withRates')};
+    if(!o.name)return;
+    closeSheet();toast('複製中…');
+    const tid=await w(()=>copyTrip(src,o));if(tid)go(tid);
+  }
+});
+document.addEventListener('input',ev=>{
+  const i=ev.target.closest&&ev.target.closest('[data-est]');if(!i)return;
+  const n=Math.max(0,Math.min(365,parseFloat(i.value)||0));S.estDays=n;
+  const out=document.getElementById(i.dataset.for);
+  if(out)out.textContent=money(n*parseFloat(i.dataset.perday),i.dataset.cur);
+});
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&!$('#layer').hidden)closeSheet();});
+
+boot();
+})();
+</script>
+
+
+</body>
+</html>
