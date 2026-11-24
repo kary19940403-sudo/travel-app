@@ -6,7 +6,7 @@
 <title>旅伴手帳</title>
 <meta name="theme-color" content="#d7e8f8">
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
-<meta name="app-version" content="2026-11-24-f">
+<meta name="app-version" content="2026-11-24-i">
 <style>[hidden]:not([hidden=until-found i]){display:none!important}html{scroll-padding-top:env(safe-area-inset-top,0px)}img{max-width:100%}html.solo [data-act="join-code"]{display:none!important}</style>
 </head>
 <body>
@@ -279,7 +279,7 @@ input[type=date]::-webkit-date-and-time-value{text-align:left;margin:0;min-heigh
 <div id="app"><div class="empty" style="margin-top:40px">載入中…</div></div>
 <div id="layer" hidden><div class="scrim" data-act="close-sheet"></div><div id="sheet" role="dialog" aria-modal="true"></div></div>
 <div id="toast" hidden></div>
-<div style="text-align:center;font-size:11px;opacity:.55;padding:6px 0 calc(var(--tab-h,58px) + 20px)">版本 2026-11-24-f</div>
+<div style="text-align:center;font-size:11px;opacity:.55;padding:6px 0 calc(var(--tab-h,58px) + 20px)">版本 2026-11-24-i</div>
 
 <script>
 /* ===== 後端轉接層：讓原本的 window.claude.use('db'/'user') 在 GitHub Pages 上也能運作 =====
@@ -403,7 +403,7 @@ function money(n,cur){
   return (n<0?'-':'')+(CUR[cur]?CUR[cur][1]:cur+' ')+s;
 }
 const SUGGEST=['護照／證件','手機與充電線','行動電源','轉接插頭','換洗衣物','盥洗用品','常用藥品','雨具','現金與信用卡','網卡／eSIM','口罩','防曬用品','拖鞋','耳機'];
-const CATS=['餐飲','交通','機票','住宿','門票','購物','其他'];
+const CATS=['餐飲','交通','機票','住宿','門票','購物','周邊','其他'];
 const FT=['來回','去程','回程','單程'];
 const DESTS=['日本','韓國','泰國','越南','新加坡','馬來西亞','香港','中國','美國','英國','歐洲','澳洲','台灣'];
 function destField(val,label){
@@ -580,7 +580,7 @@ function banner(){
   return h;
 }
 function view(){
-  if(S.ready==='nodb')return '<section class="hero"><h1>旅伴手帳</h1><p>無法連到資料庫（Firebase）。請確認網路正常、重新整理看看。</p><p class="sub" style="margin-top:8px">'+esc(String((window.__tbErr&&(window.__tbErr.code||window.__tbErr.message))||'未知原因'))+'</p><p class="sub">版本 2026-11-24-f</p></section>';
+  if(S.ready==='nodb')return '<section class="hero"><h1>旅伴手帳</h1><p>無法連到資料庫（Firebase）。請確認網路正常、重新整理看看。</p><p class="sub" style="margin-top:8px">'+esc(String((window.__tbErr&&(window.__tbErr.code||window.__tbErr.message))||'未知原因'))+'</p><p class="sub">版本 2026-11-24-i</p></section>';
   if(!S.ready)return banner()+'<div class="empty" style="margin-top:40px">載入中…</div>';
   return S.tid?tripView():homeView();
 }
@@ -1054,8 +1054,8 @@ function splitLabel(e){
   if(n===1)return pname(e.among[0])+' 全額';
   return n===S.td.people.length?'全員平分':'平分 '+n+' 人';
 }
-const OVCATS=['機票','住宿','餐飲','交通','門票','購物','網卡／保險','其他'];
-const PCATS=['機票','交通','住宿','餐飲','門票','購物','網卡／保險','其他'];
+const OVCATS=['機票','住宿','餐飲','交通','門票','購物','周邊','網卡／保險','其他'];
+const PCATS=['機票','交通','住宿','餐飲','門票','購物','周邊','網卡／保險','其他'];
 function mineSum(list,t){const rates=t.rates||{};let sum=0,missing=0;const byCat={};
   for(const e of list){const r=eRate(e,t);
     if(!(r>0)){missing++;continue;}
@@ -1166,17 +1166,19 @@ function viewMine(t){
   const list=listAll.filter(e=>!hid.has(e.cat||'其他'));
   const Mall=mineSum(listAll,t);
   const M=mineSum(list,t);
-  const shareAll=share,shareOn=!hid.has('共同分帳');
-  const total=M.sum+(shareOn?shareAll:0);
-  const bars=Object.keys(Mall.byCat).map(k=>[k,Mall.byCat[k]]);
-  if(shareAll>0)bars.push(['共同分帳',shareAll]);
+  const spAll=(S.td.spend||[]).filter(e=>e.mode!=='transfer');
+  const shareBy={};[...new Set(spAll.map(e=>e.cat||'其他'))].forEach(c=>{shareBy[c]=me?(computeLedger(t,people(),spAll.filter(e=>(e.cat||'其他')===c)).owed[me]||0)/100:0;});
+  const shareOn=Object.keys(shareBy).filter(c=>!hid.has(c)).reduce((a,c)=>a+shareBy[c],0);
+  const total=M.sum+shareOn;
+  const comb={};Object.keys(Mall.byCat).forEach(c=>{comb[c]=(comb[c]||0)+Mall.byCat[c];});Object.keys(shareBy).forEach(c=>{comb[c]=(comb[c]||0)+shareBy[c];});
+  const bars=Object.keys(comb).filter(c=>comb[c]>0).map(k=>[k,comb[k]]);
   bars.sort((a,b)=>b[1]-a[1]);
   const mx=bars.length?bars[0][1]:1;
   return '<section class="card"><h3>我這趟總共花了</h3><div class="big">'+money(D.f(total),D.cur)+'</div>'+
-   '<div class="sub">個人記帳 '+money(D.f(M.sum),D.cur)+' ＋ 共同分帳中我的份 '+money(D.f(shareOn?shareAll:0),D.cur)+'</div>'+(hid.size?'<div class="sub" style="margin-top:4px">只計入有勾選的項目。<button class="link" data-act="mine-cat" data-cat="__all">全部勾選</button></div>':'')+
+   '<div class="sub">個人記帳 '+money(D.f(M.sum),D.cur)+' ＋ 共同分帳中我的份 '+money(D.f(shareOn),D.cur)+'</div>'+(hid.size?'<div class="sub" style="margin-top:4px">只計入有勾選的項目。<button class="link" data-act="mine-cat" data-cat="__all">全部勾選</button></div>':'')+
    (M.missing?'<div class="note warn" style="margin-bottom:0">有 '+M.missing+' 筆外幣花費缺少匯率，尚未計入。到「設定」輸入匯率後會自動換算。</div>':'')+
    '<div class="sub" style="margin-top:6px">個人記帳只有你自己看得到，旅伴看不到。</div></section>'+
-  (bars.length?'<section class="card"><h3>花在哪裡</h3><div class="sub" style="margin:-4px 0 6px">點項目取消勾選，就不計入上面的總額和下面的明細。</div>'+bars.map(b=>{const off=hid.has(b[0]);return '<div class="bar'+(off?' off':'')+'" role="checkbox" aria-checked="'+(off?'false':'true')+'" tabindex="0" data-act="mine-cat" data-cat="'+esc(b[0])+'" style="cursor:pointer"><span>'+(off?'☐ ':'☑ ')+esc(b[0])+'</span><i style="width:'+Math.max(3,Math.round(b[1]/mx*100))+'%"></i><span class="num">'+money(D.f(b[1]),D.cur)+'</span></div>';}).join('')+'</section>':'')+
+  (bars.length?'<section class="card"><h3>花在哪裡</h3><div class="sub" style="margin:-4px 0 6px">每一項都已包含共同分帳中你的份。點項目取消勾選，就不計入上面的總額和下面的明細。</div>'+bars.map(b=>{const off=hid.has(b[0]);return '<div class="bar'+(off?' off':'')+'" role="checkbox" aria-checked="'+(off?'false':'true')+'" tabindex="0" data-act="mine-cat" data-cat="'+esc(b[0])+'" style="cursor:pointer"><span>'+(off?'☐ ':'☑ ')+esc(b[0])+'</span><i style="width:'+Math.max(3,Math.round(b[1]/mx*100))+'%"></i><span class="num">'+money(D.f(b[1]),D.cur)+'</span></div>';}).join('')+'</section>':'')+
   '<section><h2 class="sec" style="margin-top:6px">我的明細</h2>'+(list.length?list.map(e=>{
     const conv=entConv(e,t,D);
     return '<button class="exp" data-act="edit-mine" data-id="'+e.id+'"><span class="grow"><b>'+esc(e.title)+'<span class="tagx">'+esc(e.cat||'其他')+'</span>'+(e.ft?'<span class="tagx">'+esc(e.ft)+'</span>':'')+(e.place?'<span class="tagx">'+esc(e.place)+'</span>':'')+(e.pay?'<span class="tagx">'+esc(e.pay)+'</span>':'')+(e.pub?'<span class="tagx">公開</span>':'')+'</b>'+(e.date?'<span class="sub">'+esc(e.date)+'</span>':'')+extraSub(e,t)+(e.note?'<span class="sub" style="white-space:pre-wrap;overflow-wrap:anywhere">備註：'+esc(e.note)+'</span>':'')+'</span><span class="r">'+money(myAmt(e),e.cur)+(conv?'<small>'+esc(conv)+'</small>':'')+'</span></button>';}).join('')
@@ -1191,11 +1193,10 @@ function openMine(id){
    '<div id="m-place" hidden></div>'+
    '<div id="m-lodge" hidden><div class="two keep"><label class="f"><span>幾人分（選填）</span><input type="number" name="split" inputmode="numeric" min="1" step="1" placeholder="1" value="'+(e&&Number(e.split)>1?esc(e.split):'')+'"></label><label class="f"><span>住幾晚（選填）</span><input type="number" name="nights" inputmode="numeric" min="1" step="1" value="'+(e&&Number(e.nights)>0?esc(e.nights):'')+'"></label></div><div class="sub">金額填整間的總價；填了「幾人分」，我的花費只算你的那一份。</div></div>'+
    '<label class="f"><span>花在什麼</span><input type="text" name="title" maxlength="60" required value="'+esc(e?e.title:'')+'" placeholder="例如：來回機票"></label>'+
+   '<label class="f"><span>付款方式（選現金會自動從錢包扣）</span><select name="pay">'+payOpts(e?e.pay:null)+'</select></label>'+
    '<div class="two keep"><label class="f"><span>金額</span><input type="number" name="amount" inputmode="decimal" step="any" min="0" required value="'+(e?esc(e.amount):'')+'"></label><label class="f"><span>幣別</span><select name="cur">'+curs.map(c=>'<option value="'+c+'"'+((e?e.cur:t.base)===c?' selected':'')+'>'+c+' '+esc(cname(c))+'</option>').join('')+'</select></label></div>'+
-   
-   
-   '<label class="f"><span>付款方式（選現金會自動從錢包扣）</span><select name="pay">'+payOpts(e?e.pay:null)+'</select></label><div id="m-cash" class="hint"></div>'+
    '<div id="m-bill" hidden><div class="two keep"><label class="f"><span>刷卡帳單金額（選填）</span><input type="number" name="bill" inputmode="decimal" step="any" min="0" placeholder="帳單出來再填" value="'+esc(e&&Number(e.bill)>0?e.bill:'')+'"></label><label class="f"><span>帳單幣別</span><select name="bcur">'+bcurOpts(t,e)+'</select></label></div><label class="f"><span>手續費（選填，同帳單幣別）</span><input type="number" name="fee" inputmode="decimal" step="any" min="0" placeholder="例如海外手續費" value="'+esc(e&&Number(e.fee)>0?e.fee:'')+'"></label><div class="sub">外幣刷卡後，帳單通常是台幣：填帳單金額和手續費，這一筆就用實際匯率；不影響旅行匯率。</div></div><div id="m-rate" hidden><label class="f"><span id="m-rate-l"></span><input type="number" name="rate" inputmode="decimal" step="any" min="0" placeholder="輸入匯率"></label></div><div id="m-conv" class="hint" style="font-weight:700"></div>'+
+   '<div id="m-cash" class="hint"></div>'+
    '<label class="f"><span>日期（可不填）</span><input type="date" name="date" value="'+esc(e?(e.date||''):'')+'"></label>'+
    '<label class="f"><span>備註（只有你自己看得到）</span><textarea name="note" maxlength="300" placeholder="例如：12/3 去、12/9 回；訂位代號；哪一間店">'+esc(e?(e.note||''):'')+'</textarea></label>'+
    '<div><label class="chk"><input type="checkbox" name="pub"'+(e&&e.pub?' checked':'')+'><span class="box"></span><span class="txt">讓旅伴也看得到這一筆</span></label><div class="sub">預設只有你自己看得到。公開後，旅伴能在「旅伴公開」看到名稱、金額和分類，隨時可以取消。</div></div>'+
@@ -1306,11 +1307,11 @@ function openExpense(id){
    '<label class="f" id="x-ft"><span>機票類型</span><select name="ft">'+FT.map(c=>'<option'+((e&&e.ft===c)?' selected':'')+'>'+c+'</option>').join('')+'</select></label>'+
    '<div id="x-place" hidden></div>'+
    '<label class="f"><span>這筆是什麼</span><input type="text" name="title" maxlength="60" required value="'+esc(e?e.title:'')+'" placeholder="例如：拉麵晚餐"></label>'+
+   '<label class="f"><span>誰先付的錢</span><select name="payer">'+ppl.map(p=>'<option value="'+p.id+'"'+(p.id===payer?' selected':'')+'>'+esc(p.name)+'</option>').join('')+'</select></label>'+
+   '<label class="f"><span>付款方式（付款人用的；選現金會自動從錢包扣）</span><select name="pay">'+payOpts(e?e.pay:null)+'</select></label>'+
    '<div class="two keep"><label class="f"><span>金額</span><input type="number" name="amount" inputmode="decimal" step="any" min="0" required value="'+(e?esc(e.amount):'')+'"></label>'+
    '<label class="f"><span>幣別</span><select name="cur">'+curs.map(c=>'<option value="'+c+'"'+((e?e.cur:t.base)===c?' selected':'')+'>'+c+' '+esc(cname(c))+'</option>').join('')+'</select></label></div>'+
    '<div id="x-bill" hidden><div class="two keep"><label class="f"><span>刷卡帳單金額（選填）</span><input type="number" name="bill" inputmode="decimal" step="any" min="0" placeholder="帳單出來再填" value="'+esc(e&&Number(e.bill)>0?e.bill:'')+'"></label><label class="f"><span>帳單幣別</span><select name="bcur">'+bcurOpts(t,e)+'</select></label></div><label class="f"><span>手續費（選填，同帳單幣別）</span><input type="number" name="fee" inputmode="decimal" step="any" min="0" placeholder="例如海外手續費" value="'+esc(e&&Number(e.fee)>0?e.fee:'')+'"></label><div class="sub">外幣刷卡後，帳單通常是台幣：填帳單金額和手續費，這一筆就用實際匯率；不影響旅行匯率。</div></div><div id="x-rate" hidden><label class="f"><span id="x-rate-l"></span><input type="number" name="rate" inputmode="decimal" step="any" min="0" placeholder="輸入匯率"></label></div><div id="x-conv" class="hint" style="font-weight:700"></div>'+
-   '<label class="f"><span>誰先付的錢</span><select name="payer">'+ppl.map(p=>'<option value="'+p.id+'"'+(p.id===payer?' selected':'')+'>'+esc(p.name)+'</option>').join('')+'</select></label>'+
-   '<label class="f"><span>付款方式（付款人用的；選現金會自動從錢包扣）</span><select name="pay">'+payOpts(e?e.pay:null)+'</select></label>'+
    '<div id="x-cash" class="hint"></div>'+
    '<div><div class="lbl">怎麼分</div><div class="seg" id="x-mode"><button type="button" data-mode="equal">平分</button><button type="button" data-mode="custom">各自指定金額</button><button type="button" data-mode="treat">請客</button></div></div>'+
    '<div id="x-equal"><div class="lbl">誰要分攤（只選一個人就是幫他全付）</div><div class="chips">'+ppl.map(p=>'<button type="button" class="chip" data-p="'+p.id+'">'+esc(p.name)+'</button>').join('')+'</div></div>'+
