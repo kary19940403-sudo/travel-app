@@ -1251,19 +1251,23 @@ function payTotals(t,mineL,spL,me){
 /* per-currency wallet: exchanges in, cash out (my entries + shared ones I paid) */
 function walletStats(t,excl){
   const me=meId(),out={};
-  const g=c=>out[c]||(out[c]={inAmt:0,twd:0,cash:0,card:0,mobile:0,other:0});
-  (P().wallet||[]).forEach(x=>{if(!x.cur)return;const o=g(x.cur);o.inAmt+=Number(x.amt)||0;o.twd+=Number(x.twd)||0;});
-  const add=e=>{if(!e.pay||e.cur==='TWD'||e.id===excl)return;const o=g(e.cur);const a=Number(e.amount)||0;
+  const g=c=>out[c]||(out[c]={init:0,inAmt:0,twd:0,out:0,cash:0,card:0,mobile:0,other:0});
+  (P().wallet||[]).forEach(x=>{if(!x.cur||x.id===excl)return;
+    if(x.kind==='init'){g(x.cur).init+=Number(x.amt)||0;return;}
+    const o=g(x.cur);o.inAmt+=Number(x.amt)||0;o.twd+=Number(x.twd)||0;g('TWD').out+=Number(x.twd)||0;});
+  const add=e=>{if(!e.pay||e.id===excl)return;const o=g(e.cur);const a=Number(e.amount)||0;
     if(e.pay==='現金')o.cash+=a;else if(e.pay==='刷卡')o.card+=a;else if(e.pay==='行動支付')o.mobile+=a;else o.other+=a;};
   (P().mine||[]).forEach(add);
   S.td.spend.forEach(e=>{if(e.mode!=='transfer'&&e.payer===me)add(e);});
   return out;
 }
+const wBal=o=>o.init+o.inAmt-o.out-o.cash;
+const wHas=o=>!!o&&(o.init>0||o.inAmt>0);
 function cashHint(t,cur,a,pay,excl,mineOk){
-  if(pay!=='現金'||cur==='TWD'||!mineOk)return {text:'',bad:false};
-  const o=walletStats(t,excl)[cur];if(!o||!(o.inAmt>0))return {text:'',bad:false};
-  const left=o.inAmt-o.cash-(a||0);
-  return {text:'付完後身上剩餘 '+cur+' 現金：'+money(left,cur)+(left<0?'（超過換匯紀錄）':''),bad:left<0};
+  if(pay!=='現金'||!mineOk)return {text:'',bad:false};
+  const o=walletStats(t,excl)[cur];if(!wHas(o))return {text:'',bad:false};
+  const left=wBal(o)-(a||0);
+  return {text:'付完後身上剩餘 '+cur+' 現金：'+money(left,cur)+(left<0?'（超過錢包紀錄）':''),bad:left<0};
 }
 function leftDays(t){
   if(!t.start)return null;const d0=addDays(t.start,0),n=new Date(),n0=new Date(n.getFullYear(),n.getMonth(),n.getDate());
@@ -1297,7 +1301,7 @@ function plannerHtml(t,W){
   const pct=S.cashPct!=null?S.cashPct:(h.ratio!=null?Math.round(h.ratio*100):60);
   const o=W[c];
   const rt=(o&&o.inAmt>0&&o.twd>0)?o.twd/o.inAmt:(t.base==='TWD'&&Number(t.rates&&t.rates[c])>0?Number(t.rates[c]):(fxTWD(c)||0));
-  const rem=o?o.inAmt-o.cash:0;
+  const rem=o?wBal(o):0;
   return '<section class="card" id="plan" data-rt="'+rt+'" data-rem="'+rem+'" data-cur="'+esc(c)+'"><h3>出發前：該帶多少現金？</h3>'+
     '<label class="f"><span>要換的外幣</span><select data-plan-cur>'+L.map(x=>'<option value="'+x+'"'+(x===c?' selected':'')+'>'+x+' '+esc(cname(x))+'</option>').join('')+'</select></label>'+
     '<div class="two keep" style="margin-top:8px"><label class="f"><span>天數</span><input type="number" data-plan="days" min="0" max="365" inputmode="numeric" value="'+days+'"></label><label class="f"><span>每天預估（NT$）</span><input type="number" data-plan="per" min="0" inputmode="decimal" value="'+per+'"></label></div>'+
@@ -1306,20 +1310,27 @@ function plannerHtml(t,W){
     '<div class="sub" style="margin-top:8px">'+(h.perDay>0?'每天預估取自你過去'+(h.same?'去過同目的地':'所有')+'旅行的平均花費，現金占比取自記過的付款方式（沒有紀錄就用 60%），都可以自己改。':'還沒有足夠的過去花費，請自己填每天預估。')+'</div></section>';
 }
 function viewWallet(t){
-  const W=walletStats(t),cs=Object.keys(W),ld=leftDays(t);
+  const W=walletStats(t),ld=leftDays(t);
+  const cs=Object.keys(W).filter(c=>c==='TWD'?W[c].init>0:true).sort((a,b)=>a==='TWD'?-1:b==='TWD'?1:0);
   const cards=cs.map(c=>{
-    const o=W[c],rem=o.inAmt-o.cash,r=o.inAmt>0&&o.twd>0?o.twd/o.inAmt:0,nc=o.card+o.mobile+o.other;
+    const o=W[c],rem=wBal(o),r=o.inAmt>0&&o.twd>0?o.twd/o.inAmt:0,nc=o.card+o.mobile+o.other,tw=c==='TWD';
+    const parts=[];if(o.init>0)parts.push('出發帶 '+money(o.init,c));if(o.inAmt>0)parts.push('換匯 ＋'+money(o.inAmt,c));if(o.out>0)parts.push('換匯 −'+money(o.out,c));
+    const form=parts.join('　')+(o.cash>0?'　現金花費 −'+money(o.cash,c):'');
     return '<section class="card"><h3>'+esc(c)+' '+esc(cname(c))+'現金</h3><div class="big'+(rem<0?' neg':'')+'">'+money(rem,c)+'</div>'+
-      '<div class="sub">'+(rem<0?'已花的現金比換匯紀錄還多，可能漏記了換匯，或有用台幣付。':'身上剩下的現金（換匯合計 − 已記的現金花費）')+(ld&&rem>0?'。以剩下 '+ld+' 天算，平均每天還能花 '+money(rem/ld,c):'')+'</div>'+
-      '<div class="kv" style="margin-top:10px"><div><small>換匯合計</small><b>'+money(o.inAmt,c)+'</b></div><div><small>已花現金</small><b>'+money(o.cash,c)+'</b></div><div><small>刷卡／行動／其他</small><b>'+money(nc,c)+'</b></div></div>'+
-      (nc>0?'<div class="sub" style="margin-top:6px">刷卡 '+money(o.card,c)+'・行動支付 '+money(o.mobile,c)+'・其他 '+money(o.other,c)+'</div>':'')+
+      '<div class="sub">'+(rem<0?'已花或已換出的現金比紀錄還多，可能漏記了出發帶的錢或換匯。':'身上現在剩下的現金')+(ld&&rem>0&&!tw?'。以剩下 '+ld+' 天算，平均每天還能花 '+money(rem/ld,c):'')+'</div>'+
+      (form?'<div class="sub" style="margin-top:6px">'+form+'</div>':'')+
+      (nc>0?'<div class="sub" style="margin-top:6px">非現金：刷卡 '+money(o.card,c)+'・行動支付 '+money(o.mobile,c)+'・其他 '+money(o.other,c)+'</div>':'')+
       (r>0?'<div class="sub" style="margin-top:6px">平均換匯 1 '+esc(c)+' = '+(+r.toPrecision(4))+' TWD'+(t.base==='TWD'?'；這趟匯率 '+(Number(t.rates&&t.rates[c])||'未設定')+' <button class="link" data-act="wallet-rate" data-cur="'+c+'" data-r="'+(+r.toPrecision(5))+'">改用平均匯率</button>':'')+'</div>':'')+'</section>';
   }).join('');
   const ex=(P().wallet||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.at||0)-(a.at||0));
-  return '<div class="sub">這裡記你換了多少外幣。之後記帳時付款方式選「現金」，身上的錢會自動扣掉。這些只有你自己看得到，換匯本身不算花費。</div>'+
-    (cards||'<div class="empty">還沒有紀錄。按右下角「＋ 換匯」記下你換了多少錢。</div>')+
+  const row=x=>x.kind==='init'
+    ?'<button class="exp" data-act="edit-exch" data-id="'+x.id+'"><span class="grow"><b>出發帶 '+money(x.amt,x.cur)+'</b><span class="sub">'+esc(x.date||'')+(x.date&&x.note?' · ':'')+esc(x.note||'')+'</span></span><span class="r">初始</span></button>'
+    :'<button class="exp" data-act="edit-exch" data-id="'+x.id+'"><span class="grow"><b>'+money(x.twd,'TWD')+' → '+money(x.amt,x.cur)+'</b><span class="sub">'+esc(x.date||'')+(x.date?' · ':'')+'1 '+esc(x.cur)+' = '+(+(x.twd/x.amt).toPrecision(4))+' TWD'+(x.note?' · '+esc(x.note):'')+'</span></span><span class="r">'+esc(x.cur)+'</span></button>';
+  return '<div class="sub">記下出發時身上帶多少現金（台幣或外幣），換匯時台幣會減少、外幣增加；之後記帳選「現金」會自動扣。只有你自己看得到，換匯本身不算花費。</div>'+
+    '<div class="actions" style="margin:10px 0"><button class="btn grow" data-act="add-init">＋ 記錄身上現金</button></div>'+
+    (cards||'<div class="empty">還沒有紀錄。先按「＋ 記錄身上現金」記下出發時帶的台幣（或外幣），再用右下角「＋ 換匯」記換匯。</div>')+
     plannerHtml(t,W)+
-    '<section><h2 class="sec" style="margin-top:6px">換匯紀錄</h2>'+(ex.length?ex.map(x=>'<button class="exp" data-act="edit-exch" data-id="'+x.id+'"><span class="grow"><b>'+money(x.twd,'TWD')+' → '+money(x.amt,x.cur)+'</b><span class="sub">'+esc(x.date||'')+(x.date?' · ':'')+'1 '+esc(x.cur)+' = '+(+(x.twd/x.amt).toPrecision(4))+' TWD'+(x.note?' · '+esc(x.note):'')+'</span></span><span class="r">'+esc(x.cur)+'</span></button>').join(''):'<div class="empty">還沒有換匯紀錄。</div>')+'</section>';
+    '<section><h2 class="sec" style="margin-top:6px">現金紀錄</h2>'+(ex.length?ex.map(row).join(''):'<div class="empty">還沒有紀錄。</div>')+'</section>';
 }
 function openExch(id){
   const t=trip();const e=id?(P().wallet||[]).find(x=>x.id===id):null;if(id&&!e)return;
@@ -1329,14 +1340,34 @@ function openExch(id){
   openSheet(e?'編輯換匯':'新增換匯','<form class="stack" data-form="exch" data-id="'+(id||'')+'">'+
     '<label class="f"><span>換成的外幣</span><select name="cur">'+cs.map(c=>'<option value="'+c+'"'+(c===defc?' selected':'')+'>'+c+' '+esc(cname(c))+'</option>').join('')+'</select></label>'+
     '<div class="two keep"><label class="f"><span>花了多少台幣</span><input type="number" name="twd" inputmode="decimal" step="any" min="0" required value="'+(e?esc(e.twd):'')+'"></label><label class="f"><span>換到多少外幣</span><input type="number" name="amt" inputmode="decimal" step="any" min="0" required value="'+(e?esc(e.amt):'')+'"></label></div>'+
-    '<div id="ex-rate" class="hint" style="font-weight:700"></div>'+
+    '<div id="ex-rate" class="hint" style="font-weight:700"></div><div id="ex-twd" class="hint"></div>'+
     '<label class="f"><span>日期</span><input type="date" name="date" value="'+esc(e?(e.date||''):today)+'"></label>'+
     '<label class="f"><span>備註（在哪裡換、現鈔或帳戶）</span><input type="text" name="note" maxlength="60" value="'+esc(e?(e.note||''):'')+'"></label>'+
     '<div class="actions">'+(e?'<button type="button" class="btn danger grow" data-sx="del">刪除</button>':'')+'<button class="btn primary">儲存</button></div></form>',
     body=>{
       const form=body.querySelector('form');
-      const upd=()=>{const a=parseFloat(form.elements['twd'].value)||0,b=parseFloat(form.elements['amt'].value)||0;body.querySelector('#ex-rate').textContent=a>0&&b>0?'實際匯率：1 '+form.elements['cur'].value+' = '+(+(a/b).toPrecision(4))+' TWD':'';};
+      const upd=()=>{const a=parseFloat(form.elements['twd'].value)||0,b=parseFloat(form.elements['amt'].value)||0;body.querySelector('#ex-rate').textContent=a>0&&b>0?'實際匯率：1 '+form.elements['cur'].value+' = '+(+(a/b).toPrecision(4))+' TWD':'';
+        const W0=walletStats(t,id).TWD,te=body.querySelector('#ex-twd');
+        if(W0&&W0.init>0){const l=wBal(W0)-a;te.textContent='換完後台幣現金剩 '+money(l,'TWD')+(l<0?'（超過身上台幣）':'');te.className='hint'+(l<0?' bad':'');}else te.textContent='';};
       body.addEventListener('input',upd);body.addEventListener('change',upd);upd();
+      const b=body.querySelector('[data-sx="del"]');
+      if(b)b.addEventListener('click',()=>{if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='再按一次刪除';return;}
+        closeSheet();const tid=S.tid;const wallet=(P().wallet||[]).filter(x=>x.id!==id);
+        w(()=>q('p:'+tid,()=>dbp('data/users/'+S.uid+'/'+tid).update({wallet})));});
+    });
+}
+
+function openInit(id){
+  const e=id?(P().wallet||[]).find(x=>x.id===id&&x.kind==='init'):null;if(id&&!e)return;
+  const cs=Object.keys(CUR);
+  const n=new Date(),today=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+  openSheet(e?'編輯身上現金':'記錄身上現金','<form class="stack" data-form="init" data-id="'+(id||'')+'">'+
+    '<div class="sub">出發時身上本來就有的現金，例如帶了 NT$5,000，或上次旅行剩下的 ₩50,000。台幣和外幣各記一筆。</div>'+
+    '<div class="two keep"><label class="f"><span>幣別</span><select name="cur">'+cs.map(c=>'<option value="'+c+'"'+((e?e.cur:'TWD')===c?' selected':'')+'>'+c+' '+esc(cname(c))+'</option>').join('')+'</select></label><label class="f"><span>金額</span><input type="number" name="amt" inputmode="decimal" step="any" min="0" required value="'+(e?esc(e.amt):'')+'"></label></div>'+
+    '<label class="f"><span>日期（可不填）</span><input type="date" name="date" value="'+esc(e?(e.date||''):today)+'"></label>'+
+    '<label class="f"><span>備註</span><input type="text" name="note" maxlength="60" value="'+esc(e?(e.note||''):'')+'"></label>'+
+    '<div class="actions">'+(e?'<button type="button" class="btn danger grow" data-sx="del">刪除</button>':'')+'<button class="btn primary">儲存</button></div></form>',
+    body=>{
       const b=body.querySelector('[data-sx="del"]');
       if(b)b.addEventListener('click',()=>{if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='再按一次刪除';return;}
         closeSheet();const tid=S.tid;const wallet=(P().wallet||[]).filter(x=>x.id!==id);
@@ -1546,7 +1577,8 @@ document.addEventListener('click',ev=>{
       const t=trip();const next=(t.currencies||[]).filter(x=>x!==c);
       w(()=>q('t:'+S.tid,()=>dbp('trips/'+S.tid).update({currencies:next})));break;}
     case 'add-exch':openExch();break;
-    case 'edit-exch':openExch(d.id);break;
+    case 'add-init':openInit();break;
+    case 'edit-exch':{const x=(P().wallet||[]).find(y=>y.id===d.id);if(x&&x.kind==='init')openInit(d.id);else openExch(d.id);break;}
     case 'wallet-rate':{const tu=rateUpd(trip(),d.cur,parseFloat(d.r));if(tu)w(()=>q('t:'+S.tid,()=>dbp('trips/'+S.tid).update(tu)));toast('已把平均換匯匯率設為這趟匯率（旅伴也會看到）');break;}
     case 'edit-trip':openTripForm();break;
     case 'leave':{
@@ -1614,6 +1646,14 @@ document.addEventListener('submit',async ev=>{
     closeSheet();
     w(()=>dbp('trips/'+S.tid+'/plan/'+(id||rid(8))).set({day:parseInt(g('day'))||1,time:g('time'),title,note:g('note'),at:old&&old.at?old.at:Date.now(),...(old&&old.ord!=null?{ord:old.ord}:{})}));
     S.day=parseInt(g('day'))||1;
+  }else if(kind==='init'){
+    const tid=S.tid,id=form.dataset.id;const amt=parseFloat(g('amt'));
+    if(!(amt>0)){toast('請填寫金額');return;}
+    const list=(P().wallet||[]).slice();const old=id?list.find(x=>x.id===id):null;
+    const entry={id:id||rid(6),kind:'init',cur:g('cur'),amt,date:g('date'),note:g('note'),at:old&&old.at?old.at:Date.now()};
+    const wallet=id?list.map(x=>x.id===id?entry:x):list.concat([entry]);
+    closeSheet();
+    w(()=>q('p:'+tid,()=>dbp('data/users/'+S.uid+'/'+tid).update({wallet})));
   }else if(kind==='exch'){
     const tid=S.tid,id=form.dataset.id;const twd=parseFloat(g('twd')),amt=parseFloat(g('amt'));
     if(!(twd>0&&amt>0)){toast('請填寫台幣與外幣金額');return;}
