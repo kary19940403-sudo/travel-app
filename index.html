@@ -6,7 +6,7 @@
 <title>旅伴手帳</title>
 <meta name="theme-color" content="#d7e8f8">
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
-<meta name="app-version" content="2026-11-24-e">
+<meta name="app-version" content="2026-11-24-f">
 <style>[hidden]:not([hidden=until-found i]){display:none!important}html{scroll-padding-top:env(safe-area-inset-top,0px)}img{max-width:100%}html.solo [data-act="join-code"]{display:none!important}</style>
 </head>
 <body>
@@ -221,6 +221,7 @@ textarea{min-height:70px;resize:vertical}
 .est{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--accent-soft)}
 .ovctl{display:grid;gap:10px;margin:8px 0 4px}
 .ovflt{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin:8px 0 10px}.ovflt .f{flex:1;min-width:110px}.ovflt .btn{min-height:44px}
+.bar.off{opacity:.45}
 .erow{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:9px 0;border-top:1px solid var(--line)}.erow small{display:block;font-size:11px;color:var(--muted)}.erow b{font-variant-numeric:tabular-nums}.erow.tot{font-size:16px;font-weight:600}.erow.tot b{font-size:20px;color:var(--accent)}
 .est input{width:76px;min-height:38px;text-align:center}
 /* layout hardening: keep grid/flex children from stretching past their box */
@@ -278,7 +279,7 @@ input[type=date]::-webkit-date-and-time-value{text-align:left;margin:0;min-heigh
 <div id="app"><div class="empty" style="margin-top:40px">載入中…</div></div>
 <div id="layer" hidden><div class="scrim" data-act="close-sheet"></div><div id="sheet" role="dialog" aria-modal="true"></div></div>
 <div id="toast" hidden></div>
-<div style="text-align:center;font-size:11px;opacity:.55;padding:6px 0 calc(var(--tab-h,58px) + 20px)">版本 2026-11-24-e</div>
+<div style="text-align:center;font-size:11px;opacity:.55;padding:6px 0 calc(var(--tab-h,58px) + 20px)">版本 2026-11-24-f</div>
 
 <script>
 /* ===== 後端轉接層：讓原本的 window.claude.use('db'/'user') 在 GitHub Pages 上也能運作 =====
@@ -579,7 +580,7 @@ function banner(){
   return h;
 }
 function view(){
-  if(S.ready==='nodb')return '<section class="hero"><h1>旅伴手帳</h1><p>無法連到資料庫（Firebase）。請確認網路正常、重新整理看看。</p><p class="sub" style="margin-top:8px">'+esc(String((window.__tbErr&&(window.__tbErr.code||window.__tbErr.message))||'未知原因'))+'</p><p class="sub">版本 2026-11-24-e</p></section>';
+  if(S.ready==='nodb')return '<section class="hero"><h1>旅伴手帳</h1><p>無法連到資料庫（Firebase）。請確認網路正常、重新整理看看。</p><p class="sub" style="margin-top:8px">'+esc(String((window.__tbErr&&(window.__tbErr.code||window.__tbErr.message))||'未知原因'))+'</p><p class="sub">版本 2026-11-24-f</p></section>';
   if(!S.ready)return banner()+'<div class="empty" style="margin-top:40px">載入中…</div>';
   return S.tid?tripView():homeView();
 }
@@ -1160,18 +1161,22 @@ function viewMine(t){
   const bc=t.base,me=meId(),D=dispInfo(t);
   const L=computeLedger(t,people(),S.td.spend);
   const share=me?(L.owed[me]||0)/100:0;
-  const list=(P().mine||[]).slice().sort((a,b)=>(b.at||0)-(a.at||0));
+  const listAll=(P().mine||[]).slice().sort((a,b)=>(b.at||0)-(a.at||0));
+  const hid=new Set((S.mineHide||{})[S.tid]||[]);
+  const list=listAll.filter(e=>!hid.has(e.cat||'其他'));
+  const Mall=mineSum(listAll,t);
   const M=mineSum(list,t);
-  const total=M.sum+share;
-  const bars=Object.keys(M.byCat).map(k=>[k,M.byCat[k]]);
-  if(share>0)bars.push(['共同分帳',share]);
+  const shareAll=share,shareOn=!hid.has('共同分帳');
+  const total=M.sum+(shareOn?shareAll:0);
+  const bars=Object.keys(Mall.byCat).map(k=>[k,Mall.byCat[k]]);
+  if(shareAll>0)bars.push(['共同分帳',shareAll]);
   bars.sort((a,b)=>b[1]-a[1]);
   const mx=bars.length?bars[0][1]:1;
   return '<section class="card"><h3>我這趟總共花了</h3><div class="big">'+money(D.f(total),D.cur)+'</div>'+
-   '<div class="sub">個人記帳 '+money(D.f(M.sum),D.cur)+' ＋ 共同分帳中我的份 '+money(D.f(share),D.cur)+'</div>'+
+   '<div class="sub">個人記帳 '+money(D.f(M.sum),D.cur)+' ＋ 共同分帳中我的份 '+money(D.f(shareOn?shareAll:0),D.cur)+'</div>'+(hid.size?'<div class="sub" style="margin-top:4px">只計入有勾選的項目。<button class="link" data-act="mine-cat" data-cat="__all">全部勾選</button></div>':'')+
    (M.missing?'<div class="note warn" style="margin-bottom:0">有 '+M.missing+' 筆外幣花費缺少匯率，尚未計入。到「設定」輸入匯率後會自動換算。</div>':'')+
    '<div class="sub" style="margin-top:6px">個人記帳只有你自己看得到，旅伴看不到。</div></section>'+
-  (bars.length?'<section class="card"><h3>花在哪裡</h3>'+bars.map(b=>'<div class="bar"><span>'+esc(b[0])+'</span><i style="width:'+Math.max(3,Math.round(b[1]/mx*100))+'%"></i><span class="num">'+money(D.f(b[1]),D.cur)+'</span></div>').join('')+'</section>':'')+
+  (bars.length?'<section class="card"><h3>花在哪裡</h3><div class="sub" style="margin:-4px 0 6px">點項目取消勾選，就不計入上面的總額和下面的明細。</div>'+bars.map(b=>{const off=hid.has(b[0]);return '<div class="bar'+(off?' off':'')+'" role="checkbox" aria-checked="'+(off?'false':'true')+'" tabindex="0" data-act="mine-cat" data-cat="'+esc(b[0])+'" style="cursor:pointer"><span>'+(off?'☐ ':'☑ ')+esc(b[0])+'</span><i style="width:'+Math.max(3,Math.round(b[1]/mx*100))+'%"></i><span class="num">'+money(D.f(b[1]),D.cur)+'</span></div>';}).join('')+'</section>':'')+
   '<section><h2 class="sec" style="margin-top:6px">我的明細</h2>'+(list.length?list.map(e=>{
     const conv=entConv(e,t,D);
     return '<button class="exp" data-act="edit-mine" data-id="'+e.id+'"><span class="grow"><b>'+esc(e.title)+'<span class="tagx">'+esc(e.cat||'其他')+'</span>'+(e.ft?'<span class="tagx">'+esc(e.ft)+'</span>':'')+(e.place?'<span class="tagx">'+esc(e.place)+'</span>':'')+(e.pay?'<span class="tagx">'+esc(e.pay)+'</span>':'')+(e.pub?'<span class="tagx">公開</span>':'')+'</b>'+(e.date?'<span class="sub">'+esc(e.date)+'</span>':'')+extraSub(e,t)+(e.note?'<span class="sub" style="white-space:pre-wrap;overflow-wrap:anywhere">備註：'+esc(e.note)+'</span>':'')+'</span><span class="r">'+money(myAmt(e),e.cur)+(conv?'<small>'+esc(conv)+'</small>':'')+'</span></button>';}).join('')
@@ -1673,6 +1678,9 @@ document.addEventListener('click',ev=>{
       render(true);break;}
     case 'cmp-view':S.cmpView=d.v;render(true);break;
     case 'ov-tab':S.ovTab=d.v;render(true);break;
+    case 'mine-cat':{S.mineHide=S.mineHide||{};const k=S.tid,c=d.cat;
+      if(c==='__all')S.mineHide[k]=[];else{const h=new Set(S.mineHide[k]||[]);if(h.has(c))h.delete(c);else h.add(c);S.mineHide[k]=[...h];}
+      render(true);break;}
     case 'ov-cmp':S.cmpMode=d.v;render(true);break;
     case 'ov-cur':openOvCur();break;
     case 'home-tab':S.homeTab=d.v;if(d.v==='ov')ensureOv();render(true);break;
