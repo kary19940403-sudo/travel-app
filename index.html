@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>旅伴手帳</title>
 <meta name="theme-color" content="#d7e8f8">
+<meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
+<meta name="app-version" content="2026-11-24-a">
 <style>[hidden]:not([hidden=until-found i]){display:none!important}html{scroll-padding-top:env(safe-area-inset-top,0px)}img{max-width:100%}html.solo [data-act="join-code"]{display:none!important}</style>
 </head>
 <body>
@@ -274,6 +276,7 @@ input[type=date]::-webkit-date-and-time-value{text-align:left;margin:0;min-heigh
 <div id="app"><div class="empty" style="margin-top:40px">載入中…</div></div>
 <div id="layer" hidden><div class="scrim" data-act="close-sheet"></div><div id="sheet" role="dialog" aria-modal="true"></div></div>
 <div id="toast" hidden></div>
+<div style="text-align:center;font-size:11px;opacity:.55;padding:6px 0 calc(var(--tab-h,58px) + 20px)">版本 2026-11-24-a</div>
 
 <script>
 /* ===== 後端轉接層：讓原本的 window.claude.use('db'/'user') 在 GitHub Pages 上也能運作 =====
@@ -508,7 +511,7 @@ async function boot(){
   const C=window.claude;
   if(!C||!C.use){S.ready='nodb';render();return;}
   let db=null,user=null;
-  try{[db,user]=await Promise.all([C.use('db'),C.use('user')]);}catch(e){}
+  try{[db,user]=await Promise.all([C.use('db'),C.use('user')]);}catch(e){window.__tbErr=e;console.error('旅伴手帳 後端載入失敗',e);}
   if(!db||!user){S.ready='nodb';render();return;}
   S.db=db;S.user=user;
   S.uid=await user.id();
@@ -564,7 +567,7 @@ function banner(){
   return h;
 }
 function view(){
-  if(S.ready==='nodb')return '<section class="hero"><h1>旅伴手帳</h1><p>這個頁面需要登入 Claude 才能儲存與共用旅行資料。請登入後，再用朋友分享給你的連結開啟。</p></section>';
+  if(S.ready==='nodb')return '<section class="hero"><h1>旅伴手帳</h1><p>無法連到資料庫（Firebase）。請確認網路正常、重新整理看看。</p><p class="sub" style="margin-top:8px">'+esc(String((window.__tbErr&&(window.__tbErr.code||window.__tbErr.message))||'未知原因'))+'</p><p class="sub">版本 2026-11-24-a</p></section>';
   if(!S.ready)return banner()+'<div class="empty" style="margin-top:40px">載入中…</div>';
   return S.tid?tripView():homeView();
 }
