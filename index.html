@@ -6,7 +6,7 @@
 <title>旅伴手帳</title>
 <meta name="theme-color" content="#d7e8f8">
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
-<meta name="app-version" content="2026-11-24-c">
+<meta name="app-version" content="2026-11-24-e">
 <style>[hidden]:not([hidden=until-found i]){display:none!important}html{scroll-padding-top:env(safe-area-inset-top,0px)}img{max-width:100%}html.solo [data-act="join-code"]{display:none!important}</style>
 </head>
 <body>
@@ -278,7 +278,7 @@ input[type=date]::-webkit-date-and-time-value{text-align:left;margin:0;min-heigh
 <div id="app"><div class="empty" style="margin-top:40px">載入中…</div></div>
 <div id="layer" hidden><div class="scrim" data-act="close-sheet"></div><div id="sheet" role="dialog" aria-modal="true"></div></div>
 <div id="toast" hidden></div>
-<div style="text-align:center;font-size:11px;opacity:.55;padding:6px 0 calc(var(--tab-h,58px) + 20px)">版本 2026-11-24-c</div>
+<div style="text-align:center;font-size:11px;opacity:.55;padding:6px 0 calc(var(--tab-h,58px) + 20px)">版本 2026-11-24-e</div>
 
 <script>
 /* ===== 後端轉接層：讓原本的 window.claude.use('db'/'user') 在 GitHub Pages 上也能運作 =====
@@ -419,6 +419,7 @@ function entryRate(e,t){
   const r0=e.cur===t.base?1:Number(rt[e.cur]);
   const bc=e.bcur||t.base;const rb=bc===t.base?1:Number(rt[bc]);
   const bill=Number(e.bill)||0,fee=Number(e.fee)||0;
+  if(e.cur===t.base&&bc!==t.base)return 1+(a>0&&fee>0&&rb>0?fee*rb/a:0);
   if(a>0&&bill>0&&rb>0)return (bill+fee)*rb/a;
   if(r0>0)return r0+(a>0&&fee>0&&rb>0?fee*rb/a:0);
   return 0;
@@ -578,7 +579,7 @@ function banner(){
   return h;
 }
 function view(){
-  if(S.ready==='nodb')return '<section class="hero"><h1>旅伴手帳</h1><p>無法連到資料庫（Firebase）。請確認網路正常、重新整理看看。</p><p class="sub" style="margin-top:8px">'+esc(String((window.__tbErr&&(window.__tbErr.code||window.__tbErr.message))||'未知原因'))+'</p><p class="sub">版本 2026-11-24-c</p></section>';
+  if(S.ready==='nodb')return '<section class="hero"><h1>旅伴手帳</h1><p>無法連到資料庫（Firebase）。請確認網路正常、重新整理看看。</p><p class="sub" style="margin-top:8px">'+esc(String((window.__tbErr&&(window.__tbErr.code||window.__tbErr.message))||'未知原因'))+'</p><p class="sub">版本 2026-11-24-e</p></section>';
   if(!S.ready)return banner()+'<div class="empty" style="margin-top:40px">載入中…</div>';
   return S.tid?tripView():homeView();
 }
@@ -1062,13 +1063,13 @@ function mineSum(list,t){const rates=t.rates||{};let sum=0,missing=0;const byCat
 function mineLine(id,t){const l=(S.mine[id]&&S.mine[id].mine)||[];if(!l.length)return '';return '<span class="pass-sub">我的記帳 '+money(mineSum(l,t).sum,t.base)+'</span>';}
 const eRate=(e,t)=>entryRate(e,t);
 const myAmt=e=>(e.cat==='住宿'&&Number(e.split)>1)?Number(e.amount)/Number(e.split):Number(e.amount);
-function billSub(e,t){const bill=Number(e.bill)>0,fee=Number(e.fee)>0;if(!bill&&!fee)return '';const bc=e.bcur||t.base;const r=entryRate(e,t);
-  return [bill?'帳單 '+money(e.bill,bc):'',fee?'手續費 '+money(e.fee,bc):'',r>0&&e.cur!==t.base?'實際匯率 1 '+e.cur+' = '+(+r.toPrecision(4))+' '+t.base:''].filter(Boolean).join('，');}
+function billSub(e,t){const bill=Number(e.bill)>0,fee=Number(e.fee)>0;if(!bill&&!fee)return '';const bc=e.bcur||t.base,a=Number(e.amount)||0,tot=(Number(e.bill)||0)+(Number(e.fee)||0);
+  return [bill?'帳單合計 '+money(tot,bc)+(fee?'（含手續費 '+money(e.fee,bc)+'）':''):'手續費 '+money(e.fee,bc),bill&&a>0&&bc!==e.cur?'實際匯率 1 '+bc+' = '+(+(a/tot).toPrecision(4))+' '+e.cur:''].filter(Boolean).join('，');}
 function bcurOpts(t,e){const sel=e&&(Number(e.bill)>0||Number(e.fee)>0)?(e.bcur||t.base):'TWD';return allCurs(t).map(c=>'<option value="'+c+'"'+(c===sel?' selected':'')+'>'+c+' '+esc(cname(c))+'</option>').join('');}
 function billCalc(body,form,t,pfx){
   const cur=form.elements['cur'].value,a=parseFloat(form.elements['amount'].value)||0;
   const bb=body.querySelector('#'+pfx+'-bill'),rr=body.querySelector('#'+pfx+'-rate'),cv=body.querySelector('#'+pfx+'-conv'),ri=form.elements['rate'];
-  const bc=form.elements['bcur'].value,showB=cur!==bc;bb.hidden=!showB;
+  const bc=form.elements['bcur'].value,showB=cur!==bc&&(form.elements['pay']?form.elements['pay'].value:'')!=='現金';bb.hidden=!showB;
   const bill=showB?(parseFloat(form.elements['bill'].value)||0):0,fee=showB?(parseFloat(form.elements['fee'].value)||0):0;
   const rt=Object.assign({},t.rates||{});const rb=bc===t.base?1:Number(rt[bc]);
   const needRate=cur!==t.base&&!(bill>0&&rb>0);rr.hidden=!needRate;
@@ -1078,9 +1079,14 @@ function billCalc(body,form,t,pfx){
   }else rr.dataset.cur='';
   const r=entryRate({cur,amount:a,bill,fee,bcur:bc},Object.assign({},t,{rates:rt}));
   const adj=bill>0||fee>0;let msg='';
-  if(bill>0&&!(rb>0))msg='要用帳單換算，請先到「設定」加入 '+bc+' 的匯率。';
-  else if(a>0&&r>0&&(cur!==t.base||adj))msg=(adj?'實際匯率：1 '+cur+' = '+(+r.toPrecision(4))+' '+t.base+'，':'')+'≈ '+money(a*r,t.base);
-  else if(cur!==t.base&&!(r>0))msg='請輸入匯率才能換算成 '+t.base;
+  const rec=a>0&&r>0&&(cur!==t.base||(fee>0&&rb>0))?'記帳 ≈ '+money(a*r,t.base):'';
+  if(adj){const tot=bill+fee,p=[];
+    if(bill>0)p.push('帳單合計 '+money(tot,bc)+(fee>0?'（含手續費 '+money(fee,bc)+'）':''));else p.push('手續費 '+money(fee,bc));
+    if(bill>0&&a>0)p.push('實際匯率 1 '+bc+' = '+(+(a/tot).toPrecision(4))+' '+cur);
+    if(rec)p.push(rec);
+    msg=p.join('，');
+    if(fee>0&&!(rb>0)&&bc!==t.base)msg+='（手續費要換算進記帳，請先到「設定」加入 '+bc+' 的匯率）';
+  }else if(cur!==t.base){msg=a>0&&r>0?'≈ '+money(a*r,t.base):'請輸入匯率才能換算成 '+t.base;}
   cv.textContent=msg;return {r,adj};
 }
 function lodgeSub(e){const p=[];const sp=Number(e.split)>1?Number(e.split):0,n=Number(e.nights)>0?Number(e.nights):0;if(sp)p.push('總額 '+money(e.amount,e.cur)+' ÷ '+sp+' 人');if(n)p.push(n+' 晚，每晚每人 '+money(myAmt(e)/n,e.cur));return p.join('，');}
@@ -1213,7 +1219,7 @@ function saveMine(form){
   const cat=String(fd.get('cat'));
   const entry={id:id||rid(6),title,amount,cur:String(fd.get('cur')),cat,ft:cat==='機票'?String(fd.get('ft')||''):'',date:String(fd.get('date')||''),note:String(fd.get('note')||'').trim(),pub:!!fd.get('pub'),pay:String(fd.get('pay')||''),place:(cat==='機票'||cat==='住宿')?String(fd.get('place')||'').trim():'',at:old&&old.at?old.at:Date.now()};
   if(old&&old.from)entry.from=old.from;
-  let billV=0;{const bcS=String(fd.get('bcur')||'');if(bcS&&bcS!==entry.cur){billV=parseFloat(fd.get('bill'))||0;const feeV=parseFloat(fd.get('fee'))||0;if(billV>0||feeV>0)entry.bcur=bcS;if(billV>0)entry.bill=billV;if(feeV>0)entry.fee=feeV;}}
+  let billV=0;{const bcS=String(fd.get('bcur')||'');if(bcS&&bcS!==entry.cur&&entry.pay!=='現金'){billV=parseFloat(fd.get('bill'))||0;const feeV=parseFloat(fd.get('fee'))||0;if(billV>0||feeV>0)entry.bcur=bcS;if(billV>0)entry.bill=billV;if(feeV>0)entry.fee=feeV;}}
   if(cat==='住宿'){const sp=parseInt(fd.get('split')),nn=parseInt(fd.get('nights'));if(sp>1)entry.split=sp;if(nn>0)entry.nights=nn;}
   const mine=id?list.map(x=>x.id===id?entry:x):list.concat([entry]);
   const owner=meId();
@@ -1381,7 +1387,7 @@ async function saveExpense(form){
   }
   data.settled={};
   if(st.mode!=='treat'){const cand=st.mode==='equal'?data.among:Object.keys(data.custom);cand.forEach(pid=>{if(pid!==data.payer&&st.settled.has(pid))data.settled[pid]=true;});}
-  let billV=0;{const bcS=String(fd.get('bcur')||'');if(bcS&&bcS!==cur){billV=parseFloat(fd.get('bill'))||0;const feeV=parseFloat(fd.get('fee'))||0;if(billV>0||feeV>0)data.bcur=bcS;if(billV>0)data.bill=billV;if(feeV>0)data.fee=feeV;}}
+  let billV=0;{const bcS=String(fd.get('bcur')||'');if(bcS&&bcS!==cur&&data.pay!=='現金'){billV=parseFloat(fd.get('bill'))||0;const feeV=parseFloat(fd.get('fee'))||0;if(billV>0||feeV>0)data.bcur=bcS;if(billV>0)data.bill=billV;if(feeV>0)data.fee=feeV;}}
   const tu=billV>0?null:rateUpd(t,cur,parseFloat(fd.get('rate')));
   closeSheet();
   if(tu)await w(()=>q('t:'+S.tid,()=>dbp('trips/'+S.tid).update(tu)));
